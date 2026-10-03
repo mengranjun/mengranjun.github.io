@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="MineAI Blog">
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0ea5e9"/>
+      <stop offset="0.5" stop-color="#06b6d4"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+    <radialGradient id="gloss" cx="0.28" cy="0.08" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#brand)"/>
+  <rect width="32" height="32" rx="7" fill="url(#gloss)"/>
+  <path d="M9 23.2V8.8L16 18.2L23 8.8V23.2" fill="none" stroke="#ffffff"
+        stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
