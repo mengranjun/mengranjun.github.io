@@ -2,23 +2,47 @@
 (function () {
   "use strict";
 
-  /* ---------- Theme: init early choice, toggle, persist ---------- */
   var root = document.documentElement;
+  var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+  /* ---------- Theme ----------
+     The real no-flash initialisation lives in a tiny inline <script> in
+     each page's <head>; this is only a safety net if that is missing. */
   var stored = null;
   try { stored = localStorage.getItem("blog-theme"); } catch (e) {}
 
-  if (stored) {
-    root.setAttribute("data-theme", stored);
-  } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    root.setAttribute("data-theme", "dark");
+  if (!root.getAttribute("data-theme")) {
+    if (stored) root.setAttribute("data-theme", stored);
+    else if (mq && mq.matches) root.setAttribute("data-theme", "dark");
+  }
+
+  function isDark() { return root.getAttribute("data-theme") === "dark"; }
+
+  function syncThemeButtons() {
+    document.querySelectorAll("[data-action='toggle-theme']").forEach(function (b) {
+      b.setAttribute("aria-pressed", isDark() ? "true" : "false");
+    });
   }
 
   function toggleTheme() {
-    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    var next = isDark() ? "light" : "dark";
     root.setAttribute("data-theme", next);
     try { localStorage.setItem("blog-theme", next); } catch (e) {}
+    syncThemeButtons();
   }
 
+  // Follow the system only while the reader has not made an explicit choice.
+  if (mq && mq.addEventListener) {
+    mq.addEventListener("change", function (e) {
+      if (stored) return;
+      root.setAttribute("data-theme", e.matches ? "dark" : "light");
+      syncThemeButtons();
+    });
+  }
+
+  syncThemeButtons();
+
+  /* ---------- Delegated clicks ---------- */
   document.addEventListener("click", function (e) {
     var btn = e.target.closest("[data-action='toggle-theme']");
     if (btn) toggleTheme();
@@ -30,17 +54,32 @@
         navigator.clipboard.writeText(code.innerText).then(function () {
           copyBtn.textContent = "已复制";
           setTimeout(function () { copyBtn.textContent = "复制"; }, 1600);
+        }).catch(function () {
+          copyBtn.textContent = "复制失败";
+          setTimeout(function () { copyBtn.textContent = "复制"; }, 1600);
         });
       }
     }
+  });
+
+  document.querySelectorAll(".copy-btn").forEach(function (b) {
+    b.setAttribute("aria-live", "polite");
   });
 
   /* ---------- Mobile nav ---------- */
   var menuBtn = document.querySelector(".menu-btn");
   var nav = document.querySelector(".main-nav");
   if (menuBtn && nav) {
+    var setNav = function (open) {
+      nav.classList.toggle("open", open);
+      menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      menuBtn.setAttribute("aria-label", open ? "关闭菜单" : "打开菜单");
+    };
     menuBtn.addEventListener("click", function () {
-      nav.classList.toggle("open");
+      setNav(!nav.classList.contains("open"));
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") setNav(false);
     });
   }
 
@@ -79,8 +118,12 @@
     filterBar.addEventListener("click", function (e) {
       var btn = e.target.closest(".filter-btn");
       if (!btn) return;
-      filterBar.querySelectorAll(".filter-btn").forEach(function (b) { b.classList.remove("active"); });
+      filterBar.querySelectorAll(".filter-btn").forEach(function (b) {
+        b.classList.remove("active");
+        b.setAttribute("aria-pressed", "false");
+      });
       btn.classList.add("active");
+      btn.setAttribute("aria-pressed", "true");
       var tag = btn.getAttribute("data-tag");
       document.querySelectorAll(".post-list li").forEach(function (li) {
         var tags = (li.getAttribute("data-tags") || "").split(",");

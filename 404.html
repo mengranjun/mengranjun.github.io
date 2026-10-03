@@ -4,17 +4,63 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>页面不存在 — MineAI Blog</title>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23c2410c'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='Georgia'>M</text></svg>">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <!--
+    这个页面故意把样式内联：GitHub Pages 会用 404.html 响应任意深度的错误地址，
+    相对路径（如 css/style.css）在 /a/b/c 这样的地址下会失效。
+    如果你的站点部署在子路径（如 username.github.io/my-blog/），
+    请把下面的 href="/" 改成 href="/my-blog/"。
+  -->
+  <style>
+    :root {
+      --bg: #f4f9fb; --surface: #ffffff; --text: #1b2a31; --text-strong: #0b171d;
+      --text-muted: #5c7180; --accent: #0e7490; --border: #dce8ed;
+      --grad-1: #0ea5e9; --grad-2: #06b6d4; --grad-3: #10b981;
+      --brand-grad: linear-gradient(135deg, var(--grad-1), var(--grad-2) 50%, var(--grad-3));
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0c1418; --surface: #131e23; --text: #c2d2d9; --text-strong: #e9f3f7;
+        --text-muted: #7d929c; --accent: #38bdf8; --border: #1f2f36;
+      }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text); font-family: var(--font-sans);
+      line-height: 1.75; min-height: 100dvh; display: flex; flex-direction: column;
+    }
+    main { flex: 1; display: grid; place-items: center; }
+    .error-page { text-align: center; padding: 80px 24px; }
+    .brand { width: 68px; height: 68px; border-radius: 22%; background: var(--brand-grad);
+             display: grid; place-items: center; color: #fff; margin: 0 auto 26px;
+             box-shadow: 0 8px 26px rgba(6, 182, 212, .35); }
+    .brand svg { width: 44px; height: 44px; display: block; }
+    .error-page .code {
+      font-size: 6rem; line-height: 1; font-weight: 700; letter-spacing: -.02em;
+      background: var(--brand-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .error-page p { color: var(--text-muted); margin: 14px 0 30px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 12px 26px;
+      border-radius: 10px; font-size: .95rem; font-weight: 600; text-decoration: none;
+      background: var(--brand-grad); color: #fff; border: 1px solid transparent;
+      transition: transform .15s ease, box-shadow .2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(6, 182, 212, .4); }
+  </style>
 </head>
 <body>
   <main>
     <div class="error-page">
+      <div class="brand" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M9 23.2V8.8L16 18.2L23 8.8V23.2" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <div class="code">404</div>
       <p>你访问的页面不存在，可能已被移动或删除。</p>
-      <a class="btn btn-primary" href="index.html">回到首页</a>
+      <a class="btn" href="/">回到首页</a>
     </div>
   </main>
-  <script src="js/main.js"></script>
 </body>
 </html>

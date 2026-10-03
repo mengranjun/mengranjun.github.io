@@ -4,23 +4,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>少即是多：不写一行框架代码的博客设计思考 — MineAI Blog</title>
-  <meta name="description" content="回归 CSS 变量与原生 Web 平台的设计决策记录。">
+  <meta name="description" content="当所有工具都在劝你引入依赖时，我选择回归 CSS 变量与原生 Web 平台。这篇文章记录了模板的设计决策。">
+  <link rel="canonical" href="https://example.github.io/posts/css-thinking.html">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="MineAI Blog">
+  <meta property="og:title" content="少即是多：不写一行框架代码的博客设计思考">
+  <meta property="og:description" content="当所有工具都在劝你引入依赖时，我选择回归 CSS 变量与原生 Web 平台。这篇文章记录了模板的设计决策。">
+  <meta property="og:url" content="https://example.github.io/posts/css-thinking.html">
+  <meta property="og:image" content="https://example.github.io/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="../css/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23c2410c'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='Georgia'>M</text></svg>">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="../favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="MineAI Blog" href="https://example.github.io/feed.xml">
+  <script>(function(){try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 </head>
 <body>
   <div class="progress-bar"></div>
   <header class="site-header">
     <div class="header-inner">
-      <a class="logo" href="../index.html"><span class="logo-mark">M</span>MineAI Blog</a>
-      <button class="menu-btn" aria-label="打开菜单">
+      <a class="logo" href="../index.html"><span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M9 23.2V8.8L16 18.2L23 8.8V23.2" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>MineAI Blog</a>
+      <button class="menu-btn" aria-label="打开菜单" aria-expanded="false">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <nav class="main-nav">
         <a href="../index.html">首页</a>
         <a href="../archive.html">归档</a>
         <a href="../about.html">关于</a>
-        <button class="theme-toggle" data-action="toggle-theme" aria-label="切换深浅色主题">
+        <button class="theme-toggle" data-action="toggle-theme" aria-label="切换深浅色主题" aria-pressed="false">
           <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         </button>
@@ -35,7 +47,7 @@
           <span class="tag">前端</span>
           <span>2026-09-28</span>
           <span>·</span>
-          <span>约 6 分钟读完</span>
+          <span>约 3 分钟读完</span>
         </div>
         <h1>少即是多：不写一行框架代码的博客设计思考</h1>
         <span class="ai-notice" title="本文内容由 AI 生成，仅供参考">
@@ -45,38 +57,44 @@
       </header>
 
       <div class="article-body">
-        <p>这个模板没有使用 React、Vue、Tailwind 或任何构建工具。整个站点的"依赖清单"是零。这不是复古情怀，而是一组经过权衡的工程决策。</p>
+<p>这个模板没有使用 React、Vue、Tailwind 或任何构建工具。整个站点的"依赖清单"是零。这不是复古情怀，而是一组经过权衡的工程决策。</p>
 
-        <h2>决策一：CSS 变量做主题系统</h2>
-        <p>深浅色主题切换听起来像是需要状态管理库的场景，实际上原生 CSS 自定义属性就足够。所有颜色定义在 <code>:root</code> 与 <code>[data-theme="dark"]</code> 两组变量里，切换主题只是切换 <code>html</code> 标签上的一个属性：</p>
-        <div class="code-block">
-          <button class="copy-btn">复制</button>
-<pre><code>:root { --bg: #faf9f6; --text: #23272e; }
-[data-theme="dark"] { --bg: #17181c; --text: #d6d9df; }
+<h2>决策一：CSS 变量做主题系统</h2>
+
+<p>深浅色主题切换听起来像是需要状态管理库的场景，实际上原生 CSS 自定义属性就足够。所有颜色定义在 <code>:root</code> 与 <code>[data-theme="dark"]</code> 两组变量里，切换主题只是切换 <code>html</code> 标签上的一个属性：</p>
+
+<div class="code-block">
+  <button class="copy-btn">复制</button>
+<pre><code class="language-css">:root { --bg: #f4f9fb; --text: #1b2a31; }
+[data-theme="dark"] { --bg: #0c1418; --text: #c2d2d9; }
 
 body {
   background: var(--bg);
   color: var(--text);
   transition: background-color 0.3s ease;
 }</code></pre>
-        </div>
+</div>
 
-        <h2>决策二：系统字体栈优先</h2>
-        <p>Web 字体是博客首屏最常见的性能杀手。模板使用系统字体栈——中文走苹方/微软雅黑，标题走 Georgia/宋体类衬线——零下载、零布局偏移，且在各平台上都有得体的观感。</p>
+<h2>决策二：系统字体栈优先</h2>
 
-        <h2>决策三：动画只碰 GPU 属性</h2>
-        <p>所有过渡动画只使用 <code>transform</code> 和 <code>opacity</code>，这两个属性由合成器处理，不触发重排重绘。配合 <code>prefers-reduced-motion</code> 媒体查询，照顾对动效敏感的用户。</p>
+<p>Web 字体是博客首屏最常见的性能杀手。模板使用系统字体栈——中文走苹方/微软雅黑，标题走 Georgia/宋体类衬线——零下载、零布局偏移，且在各平台上都有得体的观感。</p>
 
-        <h2>决策四：交互保持最小化</h2>
-        <p>全站 JavaScript 不到 100 行，只做四件事：主题切换、移动端菜单、阅读进度条、滚动渐入。没有框架意味着没有 hydration 成本、没有包体积焦虑，十年后这份代码依然能跑。</p>
+<h2>决策三：动画只碰 GPU 属性</h2>
 
-        <h2>小结</h2>
-        <p>工具的价值取决于场景。对一个以阅读为核心的静态博客，原生 Web 平台提供的能力已经足够好，而"足够好"恰恰是最难做到的标准。</p>
+<p>所有过渡动画只使用 <code>transform</code> 和 <code>opacity</code>，这两个属性由合成器处理，不触发重排重绘。配合 <code>prefers-reduced-motion</code> 媒体查询，照顾对动效敏感的用户。</p>
+
+<h2>决策四：交互保持最小化</h2>
+
+<p>全站 JavaScript 不到 100 行，只做四件事：主题切换、移动端菜单、阅读进度条、滚动渐入。没有框架意味着没有 hydration 成本、没有包体积焦虑，十年后这份代码依然能跑。</p>
+
+<h2>小结</h2>
+
+<p>工具的价值取决于场景。对一个以阅读为核心的静态博客，原生 Web 平台提供的能力已经足够好，而"足够好"恰恰是最难做到的标准。</p>
       </div>
 
       <nav class="article-nav">
-        <a href="github-pages-guide.html">← 上一篇：GitHub Pages 部署指南</a>
-        <a href="hello-world.html">下一篇：Hello World →</a>
+        <a href="github-pages-guide.html">← 上一篇：零成本上线：用 GitHub Pages 托管个人博客</a>
+        <a href="hello-world.html">下一篇：Hello World：为什么我又开始写博客了 →</a>
       </nav>
     </article>
   </main>
@@ -87,6 +105,7 @@ body {
       <div class="footer-links">
         <a href="../archive.html">归档</a>
         <a href="../about.html">关于</a>
+        <a href="../feed.xml">RSS</a>
         <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
       </div>
     </div>

@@ -4,41 +4,47 @@
    ============================================ */
 
 :root {
-  --bg: #faf9f6;
+  --bg: #f4f9fb;
   --surface: #ffffff;
-  --text: #23272e;
-  --text-strong: #14171c;
-  --text-muted: #707682;
-  --accent: #c2410c;
-  --accent-soft: rgba(194, 65, 12, 0.08);
-  --border: #e6e3da;
-  --code-bg: #f1efe9;
-  --shadow: 0 1px 2px rgba(20, 23, 28, 0.04), 0 8px 24px rgba(20, 23, 28, 0.06);
+  --text: #1b2a31;
+  --text-strong: #0b171d;
+  --text-muted: #5c7180;
+  --accent: #0e7490;
+  --accent-soft: rgba(14, 116, 144, 0.08);
+  --border: #dce8ed;
+  --code-bg: #e8f1f5;
+  --shadow: 0 1px 2px rgba(9, 40, 52, 0.04), 0 8px 24px rgba(9, 40, 52, 0.07);
   --radius: 14px;
-  /* AI disclosure badge — deliberately violet, so it never competes
-     with the orange --accent used by tags, dates and links. */
-  --ai-text: #5b47c4;
-  --ai-bg: rgba(91, 71, 196, 0.07);
-  --ai-border: rgba(91, 71, 196, 0.22);
+  /* Brand: blue → cyan → green. Used by the logo, avatar, primary
+     button and the reading-progress bar. */
+  --grad-1: #0ea5e9;
+  --grad-2: #06b6d4;
+  --grad-3: #10b981;
+  --brand-grad: linear-gradient(135deg, var(--grad-1) 0%, var(--grad-2) 50%, var(--grad-3) 100%);
+  /* AI disclosure badge — indigo, so it stays in the blue family
+     without competing with the cyan --accent. */
+  --ai-text: #4338ca;
+  --ai-bg: rgba(67, 56, 202, 0.07);
+  --ai-border: rgba(67, 56, 202, 0.22);
   --font-serif: Georgia, "Times New Roman", "Songti SC", "STSong", "SimSun", serif;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
 [data-theme="dark"] {
-  --bg: #17181c;
-  --surface: #1f2127;
-  --text: #d6d9df;
-  --text-strong: #f0f1f4;
-  --text-muted: #8b909c;
-  --accent: #e8753f;
-  --accent-soft: rgba(232, 117, 63, 0.12);
-  --border: #2e313a;
-  --code-bg: #25272e;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
-  --ai-text: #a99cf0;
-  --ai-bg: rgba(169, 156, 240, 0.12);
-  --ai-border: rgba(169, 156, 240, 0.28);
+  --bg: #0c1418;
+  --surface: #131e23;
+  --text: #c2d2d9;
+  --text-strong: #e9f3f7;
+  --text-muted: #7d929c;
+  --accent: #38bdf8;
+  --accent-soft: rgba(56, 189, 248, 0.12);
+  --border: #1f2f36;
+  --code-bg: #16232a;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4);
+  --ai-text: #a5b4fc;
+  --ai-bg: rgba(165, 180, 252, 0.12);
+  --ai-border: rgba(165, 180, 252, 0.28);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -70,7 +76,7 @@ img { max-width: 100%; height: auto; }
   top: 0; left: 0;
   height: 3px;
   width: 0%;
-  background: var(--accent);
+  background: var(--brand-grad);
   z-index: 1000;
   transition: width 0.1s linear;
 }
@@ -109,15 +115,16 @@ img { max-width: 100%; height: auto; }
 
 .logo-mark {
   width: 30px; height: 30px;
-  border-radius: 8px;
-  background: var(--accent);
+  border-radius: 22%;
+  background: var(--brand-grad);
   color: #fff;
   display: grid;
   place-items: center;
-  font-size: 0.85rem;
-  font-family: var(--font-serif);
   flex-shrink: 0;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--grad-2) 35%, transparent);
 }
+
+.logo-mark svg { width: 20px; height: 20px; display: block; }
 
 .main-nav { display: flex; align-items: center; gap: 6px; }
 
@@ -205,6 +212,15 @@ main { flex: 1; }
 
 .hero h1 em { font-style: normal; color: var(--accent); }
 
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .hero h1 em {
+    background: var(--brand-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
 .hero p {
   margin-top: 20px;
   color: var(--text-muted);
@@ -229,8 +245,8 @@ main { flex: 1; }
 
 .btn:active { transform: scale(0.97); }
 
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { opacity: 1; box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 35%, transparent); transform: translateY(-1px); }
+.btn-primary { background: var(--brand-grad); color: #fff; }
+.btn-primary:hover { opacity: 1; box-shadow: 0 6px 20px color-mix(in srgb, var(--grad-2) 40%, transparent); transform: translateY(-1px); }
 
 .btn-ghost { color: var(--text); border-color: var(--border); background: var(--surface); }
 .btn-ghost:hover { opacity: 1; border-color: var(--accent); color: var(--accent); }
@@ -435,6 +451,9 @@ main { flex: 1; }
   color: var(--text-muted);
 }
 
+.article-body blockquote p { margin-bottom: 0; }
+.article-body blockquote p + p { margin-top: 0.8em; }
+
 .article-body code {
   font-family: var(--font-mono);
   font-size: 0.88em;
@@ -445,7 +464,7 @@ main { flex: 1; }
 
 .code-block {
   position: relative;
-  background: #24272e;
+  background: #0f1d24;
   border-radius: 12px;
   margin: 0 0 1.4em;
   overflow: hidden;
@@ -459,7 +478,7 @@ main { flex: 1; }
 .code-block code {
   background: none;
   padding: 0;
-  color: #d8dee9;
+  color: #cfe3ea;
   font-size: 0.88rem;
   line-height: 1.65;
   font-family: var(--font-mono);
@@ -481,6 +500,37 @@ main { flex: 1; }
 .copy-btn:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
 
 .article-body hr { border: none; border-top: 1px solid var(--border); margin: 2.4em 0; }
+
+.article-body img { border-radius: 10px; margin: 0.4em 0 1.4em; }
+
+.article-body del { color: var(--text-muted); }
+
+/* ---------- Tables ---------- */
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.6em;
+  font-size: 0.94rem;
+  display: block;
+  overflow-x: auto;
+}
+
+.article-body th,
+.article-body td {
+  border: 1px solid var(--border);
+  padding: 9px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.article-body th {
+  background: var(--accent-soft);
+  color: var(--text-strong);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.article-body tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface) 60%, transparent); }
 
 .article-nav {
   margin-top: 60px;
@@ -506,7 +556,7 @@ main { flex: 1; }
 .avatar {
   width: 200px; height: 200px;
   border-radius: 24px;
-  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 55%, #7c3aed) 100%);
+  background: var(--brand-grad);
   display: grid;
   place-items: center;
   color: #fff;
@@ -516,6 +566,8 @@ main { flex: 1; }
 }
 
 .about-side { position: sticky; top: 100px; }
+
+.avatar svg { width: 104px; height: 104px; display: block; }
 
 .about-side .name { font-family: var(--font-serif); font-size: 1.4rem; color: var(--text-strong); margin-top: 20px; }
 .about-side .bio-short { font-size: 0.88rem; color: var(--text-muted); margin-top: 6px; }
