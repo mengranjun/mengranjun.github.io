@@ -11,6 +11,7 @@
 - 文章页阅读进度条、代码块一键复制
 - 自定义 404 页面
 - 已包含 `.nojekyll`，关闭 GitHub Pages 的 Jekyll 处理
+- 每篇文章标题下方的「由AI生成」声明标签（深浅色主题均适配）
 
 ## 目录结构
 
@@ -50,7 +51,35 @@ git push -u origin main
 ## 写新文章
 
 1. 在 `posts/` 下复制任意一篇现有文章，改名并修改内容
-2. 在 `index.html` 的「最新文章」和 `archive.html` 的列表中各加一条对应卡片/条目
+2. 直接把标题下方的 AI 声明标签一并复制过去（见下节）
+3. 在 `index.html` 的「最新文章」和 `archive.html` 的列表中各加一条对应卡片/条目
+
+## 「由AI生成」声明标签
+
+出现在每篇文章标题的正下方（文章页、首页卡片、归档列表）。
+
+**样式来源**：`css/style.css` 中的 `.ai-notice`，颜色由主题变量控制：
+
+| 变量 | 浅色 | 深色 | 说明 |
+| --- | --- | --- | --- |
+| `--ai-text` | `#5b47c4` | `#a99cf0` | 文字颜色（紫色，与站点橙色 `--accent` 区分开） |
+| `--ai-bg` | `rgba(91,71,196,.07)` | `rgba(169,156,240,.12)` | 胶囊底色 |
+| `--ai-border` | `rgba(91,71,196,.22)` | `rgba(169,156,240,.28)` | 描边 |
+
+字体：`var(--font-sans)` 系统无衬线栈；字号 `0.75rem`（12px）；字重 `500`；圆角胶囊 `999px`。实测渲染为 `95 × 27.4 px`，在 360 / 390 / 768 / 1280px 宽度下均无横向溢出。
+
+**复用的 HTML 片段**（整段复制，勿改 class 名）：
+
+```html
+<span class="ai-notice" title="本文内容由 AI 生成，仅供参考">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg>
+  <span>由AI生成</span>
+</span>
+```
+
+**纯人工撰写的文章**：删掉这段 `<span class="ai-notice">…</span>` 即可，无需改 CSS。
+**只想在文章页显示、不想在列表显示**：删除 `index.html` 与 `archive.html` 里的同名片段。
+**改文案**：只改最内层 `<span>由AI生成</span>` 的文字，`title` 属性里的长说明也一并改。
 
 ## 本地预览
 
