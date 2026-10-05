@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-MineAI Blog 构建脚本（零第三方依赖，只用 Python 标准库）
+MurojBlog 构建脚本（零第三方依赖，只用 Python 标准库）
 
 用法
 ----
     python build.py                  # 构建：Markdown → HTML，并刷新首页/归档/站点地图/订阅
     python build.py new "文章标题"    # 新建一篇文章的 Markdown 草稿
     python build.py list             # 列出所有文章
+    python build.py url <网址>        # 一次性改好全站网址（推荐部署前先跑这条）
 
 你只需要在 posts/ 目录里写 .md 文件，其余全部自动生成。
 """
@@ -46,15 +47,16 @@ def _force_utf8_console() -> None:
 _force_utf8_console()
 
 # --------------------------------------------------------------------------
-# 站点配置 —— 部署前请把 url 改成你自己的地址
+# 站点配置
+# 部署前用这条命令一次改好网址：python build.py url https://你的用户名.github.io
 # --------------------------------------------------------------------------
 SITE = {
-    "name": "MineAI Blog",
-    "tagline": "记录技术与生活",
-    "description": "一个托管在 GitHub Pages 上的纯静态个人博客：记录前端工程、工具链折腾、阅读笔记与生活随笔。",
+    "name": "MurojBlog",
+    "tagline": "孟然君的个人博客",
+    "description": "MurojBlog —— 孟然君的个人博客。写技术，也写想法和日常；内容用 Markdown 书写，站点托管在 GitHub Pages 上。",
     "author": "孟然君",
     "lang": "zh-CN",
-    "url": "https://example.github.io",   # ←← 改这里，例如 https://yourname.github.io
+    "url": "https://example.github.io",   # ←← 用 python build.py url <地址> 自动修改
     "latest": 3,                          # 首页「最新文章」显示几篇
 }
 
@@ -759,6 +761,53 @@ def cmd_list() -> int:
     return 0
 
 
+def cmd_url(new_url: str) -> int:
+    """一条命令改好全站网址：改 build.py 自己的配置 + 替换静态页里写死的地址。"""
+    new_url = new_url.strip().rstrip("/")
+    if not re.match(r"^https?://", new_url):
+        print("地址要以 http:// 或 https:// 开头，例如：")
+        print("  python build.py url https://yourname.github.io")
+        print("  python build.py url https://yourname.github.io/my-blog")
+        return 1
+
+    old_url = SITE["url"].rstrip("/")
+
+    # 1) 改 build.py 自己的 SITE["url"]
+    me = Path(__file__).resolve()
+    src = me.read_text(encoding="utf-8")
+    new_src, n_cfg = re.subn(
+        r'("url"\s*:\s*)"[^"]*"',
+        lambda m: m.group(1) + '"%s"' % new_url,
+        src, count=1,
+    )
+    if n_cfg:
+        me.write_text(new_src, encoding="utf-8", newline="\n")
+        SITE["url"] = new_url          # 同步内存里的配置，否则下面的构建还用旧地址
+        print("已更新 build.py 的 SITE[\"url\"] -> %s" % new_url)
+    else:
+        print("! 没能在 build.py 里找到 SITE[\"url\"]，请手动修改")
+        SITE["url"] = new_url
+
+    # 2) 替换静态页面里写死的 canonical / og:url / og:image / feed.xml 地址
+    targets = ["index.html", "archive.html", "about.html", "404.html", "README.md"]
+    changed = 0
+    for name in targets:
+        f = ROOT / name
+        if not f.exists():
+            continue
+        text = f.read_text(encoding="utf-8")
+        if old_url and old_url in text:
+            f.write_text(text.replace(old_url, new_url), encoding="utf-8", newline="\n")
+            print("  已替换 %s" % name)
+            changed += 1
+    if not changed:
+        print("  静态页面里没有找到旧地址 %s，无需替换" % old_url)
+
+    # 3) 重新构建，让 sitemap.xml / feed.xml / 文章页一起更新
+    print()
+    return cmd_build()
+
+
 def main() -> int:
     args = sys.argv[1:]
     if not args:
@@ -771,6 +820,11 @@ def main() -> int:
         return cmd_new(args[1], args[2] if len(args) > 2 else None)
     if cmd == "list":
         return cmd_list()
+    if cmd == "url":
+        if len(args) < 2:
+            print("用法：python build.py url https://你的用户名.github.io")
+            return 1
+        return cmd_url(args[1])
     if cmd in ("build", "-h", "--help", "help"):
         print(__doc__)
         return 0

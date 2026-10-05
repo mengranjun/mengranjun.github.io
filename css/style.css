@@ -581,6 +581,220 @@ main { flex: 1; }
 .about-content h2:first-child { margin-top: 0; }
 .about-content p { color: var(--text); margin-bottom: 1.2em; }
 
+/* ============================================================
+   关于页 · 姓名彩蛋
+   把鼠标放到「孟然君」上（或键盘 Tab 聚焦、手机上点一下），依次发生：
+     ① 上方拉出一个菜单，复选框亮起
+     ② 复选框画出对勾，选中 “Muroj”
+     ③ 中文名向上滚出，英文名 Muroj 从下方滚入顶替
+     ④ 下方描述跟着替换（方案 B）或新增（方案 A）
+   全部由 CSS 驱动，不依赖 JavaScript，禁用 JS 也照常工作。
+   ============================================================ */
+
+.hello-line { position: relative; }
+
+.alias {
+  display: inline-grid;      /* grid 容器会忽略空白文本节点，排版更稳 */
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  border-radius: 6px;
+}
+.alias:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+
+/* ---- 名字舞台：中英文叠在同一格，宽度取较宽的那个，切换时不会左右抖 ---- */
+.alias-stage {
+  display: inline-grid;
+  overflow: hidden;
+  line-height: 1.5;
+  padding: 0 0.06em;
+}
+
+.alias-cn,
+.alias-en {
+  grid-area: 1 / 1;
+  text-align: center;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+}
+
+.alias-en {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  background: var(--brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  transform: translateY(105%);
+  opacity: 0;
+}
+
+/* ---- 弹出的菜单 ---- */
+.alias-menu {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  display: flex;
+  align-items: center;
+  padding: 8px 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, 8px) scale(0.92);
+  transform-origin: 50% 130%;
+  pointer-events: none;
+  z-index: 6;
+  transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.alias-menu-arrow {
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  margin-left: -5px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transform: rotate(45deg);
+  border-radius: 0 0 2px 0;
+}
+
+.alias-item { display: flex; align-items: center; gap: 7px; }
+
+.alias-item-text {
+  font-family: var(--font-sans);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-strong);
+}
+
+/* ---- 复选框：方框先亮起，再一笔画出对勾 ---- */
+.alias-check { width: 17px; height: 17px; flex-shrink: 0; }
+
+.alias-check-box {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.6;
+  opacity: 0.5;
+  transition: stroke 0.25s ease, opacity 0.25s ease;
+}
+
+.alias-check-tick {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 15;
+  stroke-dashoffset: 15;
+  transition: stroke-dashoffset 0.34s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ================= 展开状态 ================= */
+/* ① 菜单先出来 */
+.alias:hover .alias-menu,
+.alias:focus .alias-menu { opacity: 1; transform: translate(-50%, 0) scale(1); }
+
+/* ② 复选框亮起并画出对勾 */
+.alias:hover .alias-check-box,
+.alias:focus .alias-check-box { stroke: var(--accent); opacity: 1; }
+.alias:hover .alias-check-tick,
+.alias:focus .alias-check-tick { stroke-dashoffset: 0; }
+
+/* ③ 中文名上滚、英文名顶上来 */
+.alias:hover .alias-cn,
+.alias:focus .alias-cn { transform: translateY(-105%); opacity: 0; }
+.alias:hover .alias-en,
+.alias:focus .alias-en { transform: translateY(0); opacity: 1; }
+
+/* 出场顺序：菜单 0s → 勾选 0.14s → 名字 0.5s（移开鼠标不延迟，立刻还原） */
+.alias:hover .alias-check-box,
+.alias:focus .alias-check-box { transition-delay: 0.14s; }
+.alias:hover .alias-check-tick,
+.alias:focus .alias-check-tick { transition-delay: 0.26s; }
+.alias:hover .alias-cn,
+.alias:focus .alias-cn,
+.alias:hover .alias-en,
+.alias:focus .alias-en { transition-delay: 0.5s; }
+
+/* ============================================================
+   描述 · 方案 B【当前启用】：悬浮时「替换」已有的一段描述
+   两段文字叠在同一格，容器高度取较高者，切换时下方内容不跳动。
+   想停用：把 about.html 里整个 <div class="about-swap"> 注释掉。
+   ============================================================ */
+.about-swap { display: grid; align-items: start; }
+
+.about-swap > p {
+  grid-area: 1 / 1;
+  margin-bottom: 1.2em;
+  transition: opacity 0.4s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.about-swap-alt { opacity: 0; transform: translateY(10px); pointer-events: none; }
+
+.about-content:has(.alias:hover) .about-swap-default,
+.about-content:has(.alias:focus) .about-swap-default {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition-delay: 0.8s;
+}
+
+.about-content:has(.alias:hover) .about-swap-alt,
+.about-content:has(.alias:focus) .about-swap-alt {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.8s;
+}
+
+/* ============================================================
+   描述 · 方案 A【当前停用】：悬浮时「新增」一段描述
+   启用后下方内容会被推开。启用方法见 about.html 里的注释。
+   ============================================================ */
+.about-extra {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin-bottom: 0;
+  transform: translateY(-6px);
+  transition: max-height 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease,
+              transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), margin-bottom 0.5s ease;
+}
+
+.about-content:has(.alias:hover) .about-extra,
+.about-content:has(.alias:focus) .about-extra {
+  max-height: 10em;
+  opacity: 1;
+  margin-bottom: 1.2em;
+  transform: translateY(0);
+  transition-delay: 0.8s;
+}
+
+/* 减少动效偏好：不位移、不延迟，只做淡入淡出 */
+@media (prefers-reduced-motion: reduce) {
+  .alias-menu,
+  .alias-check-box,
+  .alias-check-tick,
+  .alias-cn,
+  .alias-en,
+  .about-swap > p,
+  .about-extra { transition-delay: 0s !important; }
+  .alias-en,
+  .alias:hover .alias-cn,
+  .alias:focus .alias-cn,
+  .about-swap-alt,
+  .about-extra { transform: none; }
+  .about-content:has(.alias:hover) .about-swap-default,
+  .about-content:has(.alias:focus) .about-swap-default { transform: none; }
+  .about-content:has(.alias:hover) .about-extra,
+  .about-content:has(.alias:focus) .about-extra { transform: none; }
+}
+
 .skill-chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 24px; }
 
 .chip {

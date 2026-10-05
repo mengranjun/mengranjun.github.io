@@ -1,79 +1,85 @@
-# MineAI Blog — 纯静态个人博客
+# MurojBlog
 
-零依赖、零构建工具的个人博客，专为 **GitHub Pages** 免费托管设计。
-写文章只需要写 Markdown，其余交给 `build.py`。
+> 孟然君的个人博客 —— 写技术，也写想法和日常。
+> 纯静态、零依赖，托管在 GitHub Pages 上。
 
-## 特性
+这里是博客的**源代码仓库**。站点本身只有 HTML / CSS / JavaScript，
+没有框架、没有数据库、没有服务器；文章用 Markdown 写，一条命令生成网页。
 
-- 纯 HTML / CSS / JavaScript，运行时零框架、零 CDN 依赖
-- **用 Markdown 写文章**，一条命令生成全部 HTML
-- 首页卡片、归档列表、标签筛选、文章计数全部自动生成
-- 深色 / 浅色主题切换（记忆选择、跟随系统、无首屏闪白）
-- 蓝 → 青 → 绿渐变品牌色，配套的圆角描边风 LOGO 与站点图标
-- 文章页阅读进度条、代码块一键复制、滚动渐入
-- 自动生成 `sitemap.xml`、`feed.xml`（RSS 订阅）、Open Graph 分享卡片
-- 响应式布局，无障碍属性（`aria-*`）齐备
-- 已包含 `.nojekyll`，关闭 GitHub Pages 的 Jekyll 处理
+线上地址：<https://example.github.io> ← 换成你自己的地址
 
-## 快速开始：写一篇文章
+---
+
+## 为什么是这个样子
+
+这个博客的定位很简单：**一个只属于自己、能长期活下去的地方**。
+
+- 不追热点、不排更新计划，想到什么写什么
+- 全部内容是自己写的字，托管在别人的免费基础设施上，但没有平台算法插手
+- 技术上刻意保持"原始"：十年后把仓库 clone 下来，照样能跑
+
+---
+
+## 写一篇文章
 
 ```bash
-# 1. 生成一篇 Markdown 草稿（会自动带上日期与 front matter 模板）
-python build.py new "我的第一篇技术笔记"
+# 1. 生成草稿（自动带日期和 front matter 模板）
+python build.py new "我的第一篇笔记"
 
 #    想要简短的英文网址，就在后面再加一个文件名
-python build.py new "我的第一篇技术笔记" my-first-note
-#    → posts/my-first-note.md  →  网址 /posts/my-first-note.html
+python build.py new "我的第一篇笔记" my-first-note
 
 # 2. 用任意编辑器（VS Code / Typora / 记事本）打开 posts/ 下新出现的 .md，写正文
 
-# 3. 生成 HTML
+# 3. 生成网页
 python build.py
 
 # 4. 本地预览
-python -m http.server 8080     # 然后打开 http://localhost:8080
+python -m http.server 8080        # 打开 http://localhost:8080
 
 # 5. 发布
 git add . && git commit -m "new post" && git push
 ```
 
-> 不指定文件名时，`.md` 的文件名就是标题本身（中文也没问题，GitHub Pages 支持中文网址，只是复制出来会变成百分号编码）。
-
 其他命令：
 
 ```bash
-python build.py list     # 列出所有文章
-python build.py          # 只构建（等同于 python build.py build）
+python build.py list                    # 列出所有文章
+python build.py url https://你的地址     # 一次性改好全站网址（部署前跑一次）
 ```
 
 > **工作原理**：`posts/*.md` 是唯一的内容来源。`build.py` 会
-> ①把每篇 `.md` 渲染成 `posts/<同名>.html`；
-> ②把首页卡片写进 `index.html` 的 `BUILD:POSTS` 标记之间；
-> ③把归档列表、标签按钮、文章总数写进 `archive.html` 的对应标记之间；
-> ④重新生成 `sitemap.xml` 与 `feed.xml`。
-> **标记之外的 HTML 不会被改动**，你可以放心手改首页文案、关于页等。
+> ① 把每篇 `.md` 渲染成 `posts/<同名>.html`；
+> ② 把首页卡片写进 `index.html` 的 `BUILD:POSTS` 标记之间；
+> ③ 把归档列表、标签按钮、文章总数写进 `archive.html` 的对应标记之间；
+> ④ 重新生成 `sitemap.xml` 与 `feed.xml`。
+> **标记之外的 HTML 不会被改动**，所以首页文案、关于页这些可以放心手改。
+
+---
 
 ## 目录结构
 
 ```
-├── build.py              # 构建脚本（Python 标准库，无需 pip install）
+├── build.py              # 构建脚本（只用 Python 标准库）
 ├── index.html            # 首页（卡片区由 build.py 填充）
-├── archive.html          # 归档（列表/标签/计数由 build.py 填充）
-├── about.html            # 关于页（手写）
-├── 404.html              # 404 页（样式内联，任意深度的错误地址都能正常显示）
+├── archive.html          # 归档（列表 / 标签 / 计数由 build.py 填充）
+├── about.html            # 关于页（手写，含姓名彩蛋）
+├── 404.html              # 404 页（样式内联，任意深度的错误地址都能显示）
 ├── feed.xml              # RSS 订阅（自动生成）
 ├── sitemap.xml           # 站点地图（自动生成）
 ├── og-image.png          # 社交平台分享卡片 1200×630
-├── favicon.svg           # 站点图标（矢量，任意缩放）
-├── favicon.ico           # 站点图标（16/32/48/64 位图，兼容旧浏览器）
-├── apple-touch-icon.png  # iOS 添加到主屏幕图标 180×180
+├── favicon.svg           # 站点图标（矢量）
+├── favicon.ico           # 站点图标（兼容旧浏览器）
+├── apple-touch-icon.png  # iOS 添加到主屏幕图标
 ├── posts/
-│   ├── *.md              # ← 你只需要写这些文件
+│   ├── *.md              # ← 只需要写这些
 │   └── *.html            # 由 build.py 生成，不要手改
 ├── css/style.css         # 全部样式（CSS 变量主题系统）
 ├── js/main.js            # 全部交互
 └── .nojekyll
 ```
+
+---
 
 ## 文章格式
 
@@ -83,7 +89,7 @@ python build.py          # 只构建（等同于 python build.py build）
 ---
 title: 文章标题
 date: 2026-10-02
-tags: 部署, GitHub
+tags: 随笔, AI
 summary: 一句话摘要，显示在首页卡片与归档列表里。
 ai: true
 ---
@@ -94,20 +100,20 @@ ai: true
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
 | `title` | 是 | 文章标题 |
-| `date` | 建议 | `YYYY-MM-DD`，决定排序与归档顺序；不写则用文件修改时间 |
+| `date` | 建议 | `YYYY-MM-DD`，决定排序；不写则用文件修改时间 |
 | `tags` | 否 | 逗号分隔；第一个标签显示在首页卡片左上角，全部标签自动进入归档筛选栏 |
-| `summary` | 否 | 摘要，用于卡片、归档列表、`meta description` 与 RSS |
-| `ai` | 否 | `true`/`false`，是否在标题下显示「由AI生成」标签，默认 `true` |
+| `summary` | 否 | 摘要，用于卡片、归档列表、搜索描述与 RSS |
+| `ai` | 否 | `true`/`false`，标题下是否显示「由AI生成」标签，默认 `true` |
 | `minutes` | 否 | 手动指定「约 N 分钟读完」；不写则按字数自动估算 |
-| `slug` | 否 | 自定义输出文件名；不写则用 `.md` 的文件名 |
+| `slug` | 否 | 自定义输出文件名 |
 
 ### 支持的 Markdown 语法
 
 | 写法 | 效果 |
 | --- | --- |
-| `## 标题` / `### 标题` | 二级 / 三级标题（`#` 也当二级标题，文章大标题由 front matter 决定） |
-| `**粗体**`、`*斜体*`、`` `行内代码` ``、`~~删除线~~` | 行内样式 |
-| `[文字](链接)`、`![说明](图片)` | 链接与图片（图片自动加 `loading="lazy"`） |
+| `## 标题` / `### 标题` | 二级 / 三级标题（`#` 也当二级标题） |
+| `**粗体**` `*斜体*` `` `行内代码` `` `~~删除线~~` | 行内样式 |
+| `[文字](链接)` `![说明](图片)` | 链接与图片（图片自动加 `loading="lazy"`） |
 | `- 项目` / `1. 项目` | 无序 / 有序列表，**缩进两格即可嵌套** |
 | `> 引用` | 引用块 |
 | ` ```语言 … ``` ` | 代码块，自动带「复制」按钮 |
@@ -115,23 +121,27 @@ ai: true
 | `---` | 分隔线 |
 | `<br>`、`<span>` 等原生 HTML | 原样保留，可用来做特殊排版 |
 
-段落里**换行不会变成空格**：中文之间自动直接相连，英文之间才补空格，所以一行写很长、随时回车断句都不会影响排版。
+段落里**换行不会变成空格**：中文之间自动直接相连，英文之间才补空格，
+所以一行写多长、随时回车断句都不影响最终排版。
+
+---
 
 ## 配色与品牌
 
-主题色定义在 `css/style.css` 顶部，改那两个变量块即可整体换色。
+主题色集中在 `css/style.css` 顶部的两个变量块，改那里就能整体换色。
 
 | 变量 | 浅色 | 深色 | 用途 |
 | --- | --- | --- | --- |
 | `--bg` | `#f4f9fb` | `#0c1418` | 页面底色 |
-| `--surface` | `#ffffff` | `#131e23` | 卡片 / 代码块外的面板 |
+| `--surface` | `#ffffff` | `#131e23` | 卡片 / 菜单 / 代码块 |
 | `--accent` | `#0e7490` | `#38bdf8` | 链接、标签、标题左侧竖线 |
 | `--grad-1/2/3` | `#0ea5e9` / `#06b6d4` / `#10b981` | 同左 | 品牌渐变（蓝 → 青 → 绿） |
 | `--ai-text` | `#4338ca` | `#a5b4fc` | 「由AI生成」标签文字 |
 
-`--brand-grad` 是 `--grad-1 → --grad-2 → --grad-3` 的 135° 渐变，用在 LOGO、关于页头像、主按钮、阅读进度条和首页标题高亮上。
+`--brand-grad` 是上面三色的 135° 渐变，用在 LOGO、关于页头像、主按钮、
+阅读进度条、首页标题高亮和关于页的英文名上。
 
-**换 LOGO**：LOGO 由一条描边路径定义，`M` 的写法是
+**换 LOGO**：LOGO 就是一条描边路径，`M` 的写法是
 
 ```html
 <svg viewBox="0 0 32 32"><path d="M9 23.2V8.8L16 18.2L23 8.8V23.2"
@@ -139,39 +149,71 @@ ai: true
   stroke-linecap="round" stroke-linejoin="round"/></svg>
 ```
 
-改 `d` 就能换字母。站点图标另存于 `favicon.svg` / `favicon.ico` / `apple-touch-icon.png`，换图标时三个都要替换。
+改 `d` 就能换字母。站点图标另有 `favicon.svg` / `favicon.ico` /
+`apple-touch-icon.png` 三个文件，换图标时都要替换。
+
+---
+
+## 关于页的姓名彩蛋
+
+把鼠标放到关于页的「孟然君」上（键盘 Tab 聚焦、手机上点一下也行），会依次发生：
+
+1. 名字上方拉出一个菜单，复选框亮起
+2. 复选框一笔画出对勾，选中 **Muroj**
+3. 中文名向上滚出，英文名 `Muroj` 从下方滚入顶替
+4. 下方描述跟着替换
+
+全部由 CSS 驱动，**禁用 JavaScript 也照常工作**。
+样式在 `css/style.css` 里搜索「姓名彩蛋」，结构在 `about.html` 里。
+描述有两种写法（换掉原段落 / 新增一段），说明都写在 `about.html` 的注释里。
+
+---
 
 ## 部署到 GitHub Pages
 
-1. 在 GitHub 新建公开仓库，命名为 `你的用户名.github.io`（想要 `https://用户名.github.io` 这样的短域名）
+1. 在 GitHub 新建**公开**仓库，命名为 `你的用户名.github.io`
+   （想要 `https://用户名.github.io` 这样的短域名就必须这么命名）
 2. 推送代码：
 
 ```bash
 git init
 git add .
-git commit -m "Initial blog"
+git commit -m "Initial commit"
 git branch -M main
 git remote add origin https://github.com/你的用户名/你的用户名.github.io.git
 git push -u origin main
 ```
 
-3. 仓库 **Settings → Pages → Build and deployment** 选 **Deploy from a branch**，分支 `main`、目录 `/(root)`
+3. 仓库 **Settings → Pages → Build and deployment**，选 **Deploy from a branch**，
+   分支 `main`、目录 `/(root)`，保存。约一分钟后访问 `https://你的用户名.github.io`
 
-> **部署前记得改两处地址**：
-> 1. `build.py` 里的 `SITE["url"]` —— 改成你的真实地址，否则 `sitemap.xml`、`feed.xml` 和分享卡片的链接会是占位值；
-> 2. 各 HTML 里的 `og:url` / `canonical` —— 它们是静态写死的，`index.html`、`archive.html`、`about.html`、`404.html` 各一处。
-> 改完重新运行 `python build.py`。
+4. **把网址改对**（重要，只跑一次）：
+
+```bash
+python build.py url https://你的用户名.github.io
+```
+
+这条命令会自动帮你改好 `build.py` 里的配置、四个静态页里写死的
+`canonical` / `og:url` / `og:image` 地址、以及 `sitemap.xml`、`feed.xml`，
+然后重新构建一遍。改完记得 `git add . && git commit -m "set site url" && git push`。
+
+> 用普通项目仓库（如 `my-blog`）也可以，此时网址是
+> `https://你的用户名.github.io/my-blog`，那么第 4 步就写这个完整地址。
+
+---
 
 ## 本地预览
 
-直接双击 `index.html`，或启动本地服务器（推荐，路径与线上一致）：
+直接双击 `index.html` 也能看，但推荐起一个本地服务器（路径和线上一致）：
 
 ```bash
 python -m http.server 8080
 # 访问 http://localhost:8080
 ```
 
+---
+
 ## 环境要求
 
 只需要 **Python 3.8+**，不需要 `pip install` 任何东西 —— `build.py` 只用标准库。
-Windows 上双击运行也可以，控制台编码已在脚本内自动切成 UTF-8。
+Windows 下控制台编码会在脚本里自动切成 UTF-8，不会出现中文乱码。

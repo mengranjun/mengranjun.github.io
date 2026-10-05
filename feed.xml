@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>MineAI Blog</title>
+    <title>MurojBlog</title>
     <link>https://example.github.io/</link>
-    <description>一个托管在 GitHub Pages 上的纯静态个人博客：记录前端工程、工具链折腾、阅读笔记与生活随笔。</description>
+    <description>MurojBlog —— 孟然君的个人博客。写技术，也写想法和日常；内容用 Markdown 书写，站点托管在 GitHub Pages 上。</description>
     <language>zh-CN</language>
     <atom:link href="https://example.github.io/feed.xml" rel="self" type="application/rss+xml"/>
     <lastBuildDate>Sat, 03 Oct 2026 00:00:00 +0800</lastBuildDate>
@@ -12,7 +12,7 @@
       <link>https://example.github.io/posts/AI是什么.html</link>
       <guid isPermaLink="true">https://example.github.io/posts/AI是什么.html</guid>
       <pubDate>Sat, 03 Oct 2026 00:00:00 +0800</pubDate>
-      <description>本文介绍了AI的定义、发展历程、应用场景，以及它如何影响我们的生活和工作。</description>
+      <description>记录我对 AI 的一些想法：它到底起到了什么作用，以及我们该怎样和它相处。</description>
     </item>
     <item>
       <title>零成本上线：用 GitHub Pages 托管个人博客</title>
