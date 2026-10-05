@@ -1,0 +1,6 @@
+# 本地临时 / 编辑器产物（不要发布到 GitHub Pages）
+.dsh-verify/
+.idea/
+.workbuddy/
+__pycache__/
+*.pyc

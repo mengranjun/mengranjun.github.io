@@ -6,7 +6,7 @@
 这里是孟然君博客的**源代码仓库**。站点本身只有 HTML / CSS / JavaScript，
 没有框架、没有数据库、没有服务器；文章用 Markdown 写，一条命令生成网页。
 
-访问地址：<https://mengranjun.github.io> 
+访问地址：<https://mengranjun.github.io/mengranjun/> 
 
 如果你对这个项目感兴趣，想省点麻烦的话，可以参考下面AI写的内容。
 日后如果我有新点子，也会尝试优化提示词，让不同的AI把我的想象变为现实。
