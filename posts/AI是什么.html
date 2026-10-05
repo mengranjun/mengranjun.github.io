@@ -18,7 +18,7 @@
   <link rel="alternate icon" href="../favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
   <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://example.github.io/feed.xml">
-  <script>(function(){try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <div class="progress-bar"></div>
@@ -52,12 +52,23 @@
         <h1>AI是什么</h1>
       </header>
 
-      <div class="article-body">
-<h2>我对AI的看法</h2>
+      <nav class="toc" aria-label="文章目录">
+        <div class="toc-head">
+          <span>目录</span>
+          <span class="toc-count">2 节</span>
+        </div>
+        <ol class="toc-list">
+          <li><a href="#我对ai的看法">我对AI的看法</a></li>
+          <li><a href="#ai到底起到了什么作用">AI到底起到了什么作用</a></li>
+        </ol>
+      </nav>
+
+            <div class="article-body">
+<h2 id="我对ai的看法">我对AI的看法</h2>
 
 <p>近几年，随着AI的发展，AI也变得越来越实用。如今，我们阅读过的文章、浏览过的图片、刷过的短视频，都留下了AI的踪迹。AI已经越来越实用了，以往难以落实的想法，交给AI，它就可以帮你实现；以往需要大多数重复性的工作，交给AI，它就可以帮你完成。AI的全能，不可避免地使不少人开始思考着AI的未来。互联网上越来越多的人开始担忧起AI是否会“顶替人类”，更有甚者开始担心AI将“统治地球”。借此对AI思考的不同观点，我便写此文以记录我的观点。</p>
 
-<h2>AI到底起到了什么作用</h2>
+<h2 id="ai到底起到了什么作用">AI到底起到了什么作用</h2>
 
 <p>提到AI</p>
       </div>
@@ -82,5 +93,6 @@
   </footer>
 
   <script src="../js/main.js"></script>
+  <script src="../js/enhance.js"></script>
 </body>
 </html>

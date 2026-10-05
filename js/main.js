@@ -1,9 +1,10 @@
-/* MineAI Blog — main.js (zero dependency) */
+/* MurojBlog — main.js (zero dependency) */
 (function () {
   "use strict";
 
   var root = document.documentElement;
   var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ---------- Theme ----------
      The real no-flash initialisation lives in a tiny inline <script> in
@@ -24,11 +25,36 @@
     });
   }
 
-  function toggleTheme() {
+  /* 主题切换。支持 View Transitions 的浏览器里，新主题会从按钮的位置
+     以一个圆形扩散铺满整屏；不支持、或用户关闭了动效时，直接切换。 */
+  function toggleTheme(originEl) {
     var next = isDark() ? "light" : "dark";
-    root.setAttribute("data-theme", next);
-    try { localStorage.setItem("blog-theme", next); } catch (e) {}
-    syncThemeButtons();
+    var apply = function () {
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("blog-theme", next); } catch (e) {}
+      syncThemeButtons();
+    };
+
+    if (reduced || !document.startViewTransition || !originEl) { apply(); return; }
+
+    var r = originEl.getBoundingClientRect();
+    var x = r.left + r.width / 2;
+    var y = r.top + r.height / 2;
+    var far = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+
+    var vt;
+    try { vt = document.startViewTransition(apply); } catch (e) { apply(); return; }
+    if (!vt || !vt.ready) { apply(); return; }
+
+    vt.ready.then(function () {
+      document.documentElement.animate(
+        { clipPath: ["circle(0px at " + x + "px " + y + "px)",
+                     "circle(" + far + "px at " + x + "px " + y + "px)"] },
+        { duration: 560, easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+          pseudoElement: "::view-transition-new(root)" }
+      );
+    }).catch(function () {});
+    if (vt.finished && vt.finished.catch) vt.finished.catch(function () {});
   }
 
   // Follow the system only while the reader has not made an explicit choice.
@@ -45,7 +71,7 @@
   /* ---------- Delegated clicks ---------- */
   document.addEventListener("click", function (e) {
     var btn = e.target.closest("[data-action='toggle-theme']");
-    if (btn) toggleTheme();
+    if (btn) toggleTheme(btn);
 
     var copyBtn = e.target.closest(".copy-btn");
     if (copyBtn) {

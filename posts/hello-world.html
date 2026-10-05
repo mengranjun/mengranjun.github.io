@@ -18,7 +18,7 @@
   <link rel="alternate icon" href="../favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
   <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://example.github.io/feed.xml">
-  <script>(function(){try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <div class="progress-bar"></div>
@@ -56,14 +56,26 @@
         </span>
       </header>
 
-      <div class="article-body">
+      <nav class="toc" aria-label="文章目录">
+        <div class="toc-head">
+          <span>目录</span>
+          <span class="toc-count">3 节</span>
+        </div>
+        <ol class="toc-list">
+          <li><a href="#写作是思考的整理术">写作是思考的整理术</a></li>
+          <li><a href="#为什么是独立博客">为什么是独立博客</a></li>
+          <li><a href="#接下来会写什么">接下来会写什么</a></li>
+        </ol>
+      </nav>
+
+            <div class="article-body">
 <p>每个程序员的第一行代码几乎都是 <code>Hello World</code>。用它作为博客的第一篇文章标题，算是一种仪式感。</p>
 
-<h2>写作是思考的整理术</h2>
+<h2 id="写作是思考的整理术">写作是思考的整理术</h2>
 
 <p>很多想法在脑子里盘旋时显得清晰，落到纸面上才发现漏洞百出。写作的价值不在于产出内容，而在于强迫大脑把模糊的念头压缩成结构化的表达。博客是这个压缩过程的容器。</p>
 
-<h2>为什么是独立博客</h2>
+<h2 id="为什么是独立博客">为什么是独立博客</h2>
 
 <p>信息流平台的推荐算法决定了什么能被看见，而独立博客把解释权交还给作者自己。没有点赞数的焦虑，没有字数下限的妥协，文章的价值由时间检验。托管在 GitHub Pages 上，这个站点理论上可以和我的账号一样长寿。</p>
 
@@ -71,7 +83,7 @@
   <p>「写作不是记录思考的结果，写作本身就是思考。」</p>
 </blockquote>
 
-<h2>接下来会写什么</h2>
+<h2 id="接下来会写什么">接下来会写什么</h2>
 
 <p>计划覆盖三类内容：前端工程中的具体技术问题、工具与工作流的折腾记录、以及不定期的生活随笔。频率不做承诺，质量优先。</p>
 
@@ -98,5 +110,6 @@
   </footer>
 
   <script src="../js/main.js"></script>
+  <script src="../js/enhance.js"></script>
 </body>
 </html>

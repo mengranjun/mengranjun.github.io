@@ -279,7 +279,14 @@ main { flex: 1; }
   gap: 22px;
 }
 
+/* transform 流水线：3D 倾斜(--rx/--ry) + 上浮/渐入(--rise)
+   全部走 CSS 变量，JS 只改变量，避免和 .reveal 的 transform 打架 */
 .post-card {
+  --rx: 0deg;
+  --ry: 0deg;
+  --rise: 22px;
+  --sheen-x: 50%;
+  --sheen-y: 0%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -287,11 +294,35 @@ main { flex: 1; }
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
   position: relative;
+  transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry)) translateY(var(--rise));
+  transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
-.post-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+/* 悬浮时卡片表面的高光，位置跟着光标 */
+.post-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle 240px at var(--sheen-x) var(--sheen-y),
+              color-mix(in srgb, var(--accent) 16%, transparent), transparent 72%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.post-card.visible { --rise: 0px; opacity: 1; }
+
+.post-card:hover {
+  --rise: -4px;
+  box-shadow: var(--shadow);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+.post-card:hover::after { opacity: 1; }
 
 .post-card .card-top { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--text-muted); }
 
@@ -589,6 +620,8 @@ main { flex: 1; }
      ③ 中文名向上滚出，英文名 Muroj 从下方滚入顶替
      ④ 下方描述跟着替换（方案 B）或新增（方案 A）
    全部由 CSS 驱动，不依赖 JavaScript，禁用 JS 也照常工作。
+   外面那圈「小黑/白框 + 四角括号 + 呼吸点」是给读者的提示：
+   一眼就知道这里有东西可以点。
    ============================================================ */
 
 .hello-line { position: relative; }
@@ -598,15 +631,73 @@ main { flex: 1; }
   position: relative;
   cursor: pointer;
   outline: none;
-  border-radius: 6px;
+  padding: 0.02em 0.5em 0.06em;
+  border: 1px solid color-mix(in srgb, var(--text-strong) 32%, transparent);
+  border-radius: 10px;
+  transition: border-color 0.25s ease, background-color 0.25s ease;
 }
+
+.alias:hover,
+.alias:focus {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
 .alias:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
 
-/* ---- 名字舞台：中英文叠在同一格，宽度取较宽的那个，切换时不会左右抖 ---- */
+/* 四角括号：hover 时向外张开一点 */
+.alias::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 13px;
+  pointer-events: none;
+  opacity: 0.6;
+  transition: opacity 0.3s ease, inset 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  background:
+    linear-gradient(var(--accent), var(--accent)) left top / 10px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) left top / 2px 10px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) right top / 10px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) right top / 2px 10px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) left bottom / 10px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) left bottom / 2px 10px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) right bottom / 10px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) right bottom / 2px 10px no-repeat;
+}
+
+.alias:hover::before,
+.alias:focus::before { opacity: 1; inset: -7px; }
+
+/* 右上角的呼吸小圆点：提示“这里可以点” */
+.alias::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: none;
+  animation: aliasHint 2.6s ease-out infinite;
+}
+
+@keyframes aliasHint {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent); }
+  65%  { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* 一旦玩过一次，呼吸点换成实心小勾（见下方 .is-chosen） */
+.about-grid.is-chosen .alias::after { animation: none; }
+
+/* ---- 名字舞台：中英文叠在同一格，宽度取较宽的那个，切换时不会左右抖 ----
+   line-height 必须继承 h2，否则整块会比周围文字高/低几个像素 */
 .alias-stage {
   display: inline-grid;
+  align-items: center;       /* 中英文字体不同，按视觉中心对齐更齐整 */
   overflow: hidden;
-  line-height: 1.5;
+  line-height: inherit;
   padding: 0 0.06em;
 }
 
@@ -617,14 +708,20 @@ main { flex: 1; }
   transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
 }
 
+/* 中英文都给品牌渐变，视觉统一 */
+.alias-cn,
 .alias-en {
-  font-family: var(--font-sans);
-  font-weight: 700;
-  letter-spacing: 0.005em;
   background: var(--brand-grad);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+.alias-en {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.96em;
+  letter-spacing: 0.005em;
   transform: translateY(105%);
   opacity: 0;
 }
@@ -725,7 +822,8 @@ main { flex: 1; }
 
 /* ============================================================
    描述 · 方案 B【当前启用】：悬浮时「替换」已有的一段描述
-   两段文字叠在同一格，容器高度取较高者，切换时下方内容不跳动。
+   两段文字叠在同一格、同一位置：只改 opacity 和一点点模糊，
+   不做位移，所以两段话看起来落在完全相同的位置上。
    想停用：把 about.html 里整个 <div class="about-swap"> 注释掉。
    ============================================================ */
 .about-swap { display: grid; align-items: start; }
@@ -733,22 +831,22 @@ main { flex: 1; }
 .about-swap > p {
   grid-area: 1 / 1;
   margin-bottom: 1.2em;
-  transition: opacity 0.4s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.42s ease, filter 0.42s ease;
 }
 
-.about-swap-alt { opacity: 0; transform: translateY(10px); pointer-events: none; }
+.about-swap-alt { opacity: 0; filter: blur(3px); pointer-events: none; }
 
 .about-content:has(.alias:hover) .about-swap-default,
 .about-content:has(.alias:focus) .about-swap-default {
   opacity: 0;
-  transform: translateY(-10px);
+  filter: blur(3px);
   transition-delay: 0.8s;
 }
 
 .about-content:has(.alias:hover) .about-swap-alt,
 .about-content:has(.alias:focus) .about-swap-alt {
   opacity: 1;
-  transform: translateY(0);
+  filter: blur(0);
   transition-delay: 0.8s;
 }
 
@@ -834,12 +932,14 @@ main { flex: 1; }
 .error-page p { color: var(--text-muted); margin: 18px 0 30px; }
 
 /* ---------- Reveal animation ---------- */
-.reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-.reveal.visible { opacity: 1; transform: translateY(0); }
+/* 只在 JS 可用时隐藏，否则禁用 JS 的用户会看到一片空白 */
+.js .reveal { opacity: 0; }
+.js .reveal.visible { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .reveal { opacity: 1; transform: none; transition: none; }
+  .js .reveal { opacity: 1; }
+  .post-card { --rise: 0px !important; }
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
@@ -867,4 +967,344 @@ main { flex: 1; }
   .about-grid { grid-template-columns: 1fr; gap: 30px; }
   .about-side { position: static; }
   .hero { padding: 56px 0 44px; }
+}
+
+/* ==========================================================================
+   以下为「渐进增强」效果。全部由 js/enhance.js 按需启用，
+   缺少对应元素时相关样式不会产生任何影响。
+   ========================================================================== */
+
+/* ---------- 1. 主题切换：从按钮扩散开来的圆形动画 ---------- */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+
+/* ---------- 2. 首页：跟随光标的柔光 ---------- */
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle 380px at var(--mx, 62%) var(--my, 28%),
+              color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.hero.is-tracking::after { opacity: 1; }
+
+.hero .container { position: relative; z-index: 1; }
+
+/* ---------- 3. 首页标题：打字机 ---------- */
+.tw-caret {
+  display: inline-block;
+  width: 0.06em;
+  height: 0.92em;
+  margin-left: 0.06em;
+  vertical-align: -0.1em;
+  background: var(--accent);
+  animation: twBlink 1s steps(1, end) infinite;
+}
+
+@keyframes twBlink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+/* ---------- 4. 命令面板（Ctrl / Cmd + K） ---------- */
+.cmdk {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 20px 20px;
+}
+
+.cmdk[hidden] { display: none; }
+
+.cmdk-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, #04090c 55%, transparent);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: cmdkFade 0.18s ease both;
+}
+
+.cmdk-panel {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+  overflow: hidden;
+  animation: cmdkRise 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cmdkFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cmdkRise { from { opacity: 0; transform: translateY(-10px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+.cmdk-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cmdk-input-row svg { width: 17px; height: 17px; color: var(--text-muted); flex-shrink: 0; }
+
+.cmdk-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  min-width: 0;
+}
+
+.cmdk-input::placeholder { color: var(--text-muted); }
+
+.cmdk-results {
+  list-style: none;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  padding: 6px;
+  margin: 0;
+}
+
+.cmdk-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  scroll-margin: 6px;
+}
+
+.cmdk-item.is-active { background: var(--accent-soft); }
+
+.cmdk-item-title {
+  flex: 1;
+  font-size: 0.95rem;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmdk-item-title mark {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.cmdk-item-meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.cmdk-kind {
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.cmdk-empty { padding: 26px 16px; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+
+.cmdk-foot {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 9px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+
+.cmdk-foot kbd {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-right: 3px;
+}
+
+.nav-search {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  margin-left: 10px;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.nav-search:hover { color: var(--accent); border-color: var(--accent); }
+.nav-search svg { width: 17px; height: 17px; }
+
+/* ---------- 5. 文章目录 ---------- */
+.article-body h2, .article-body h3 { scroll-margin-top: 92px; }
+
+.toc {
+  margin: 0 0 34px;
+  padding: 16px 18px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  border-left: 3px solid var(--accent);
+}
+
+.toc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.toc-count { font-family: var(--font-mono); font-size: 0.72rem; }
+
+.toc-list { list-style: none; margin: 0; padding: 0; }
+.toc-list li { margin: 0; }
+
+.toc-list a {
+  display: block;
+  padding: 4px 0 4px 12px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  border-left: 2px solid transparent;
+  margin-left: -2px;
+  transition: color 0.2s ease, border-color 0.2s ease, padding-left 0.2s ease;
+}
+
+.toc-list a:hover { color: var(--accent); opacity: 1; }
+
+.toc-list a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  padding-left: 16px;
+  font-weight: 600;
+}
+
+.toc-list .toc-sub a { padding-left: 26px; font-size: 0.85rem; }
+.toc-list .toc-sub a.active { padding-left: 30px; }
+
+/* 宽屏时目录浮到文章左侧 */
+@media (min-width: 1200px) {
+  .toc {
+    position: fixed;
+    top: 96px;
+    left: calc(50% - 610px);
+    width: 222px;
+    max-height: calc(100dvh - 140px);
+    overflow-y: auto;
+    margin: 0;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+}
+
+/* ---------- 6. 回到顶部 + 进度环 ---------- */
+.to-top {
+  position: fixed;
+  right: 26px;
+  bottom: 26px;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  z-index: 900;
+  opacity: 0;
+  transform: translateY(14px) scale(0.9);
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.to-top.show { opacity: 1; transform: none; pointer-events: auto; }
+
+.to-top svg.ring { position: absolute; inset: 0; width: 46px; height: 46px; transform: rotate(-90deg); }
+
+.to-top-track { fill: var(--surface); stroke: var(--border); stroke-width: 2.5; }
+
+.to-top-arc {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 119.4;
+  stroke-dashoffset: calc(119.4 - 119.4 * var(--p, 0));
+}
+
+.to-top .arrow {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 17px;
+  height: 17px;
+  color: var(--text-muted);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.to-top:hover .arrow { color: var(--accent); transform: translateY(-2px); }
+
+/* ---------- 7. 姓名彩蛋的「余韵」 ---------- */
+/* 玩过一次之后：对勾保持勾选、头像浮出 Muroj 水印 */
+.about-grid.is-chosen .alias-check-box { stroke: var(--accent); opacity: 1; }
+.about-grid.is-chosen .alias-check-tick { stroke-dashoffset: 0; }
+
+.avatar { position: relative; overflow: hidden; }
+
+.avatar::after {
+  content: "Muroj";
+  position: absolute;
+  inset: auto 0 13% 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: 2.5rem;
+  letter-spacing: -0.02em;
+  color: rgba(255, 255, 255, 0.26);
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.about-grid.is-chosen .avatar::after { opacity: 1; transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .alias::after { animation: none; }
+  .tw-caret { animation: none; }
+  .hero::after { transition: none; }
+  .about-swap > p { transition: none; filter: none; }
+  .about-swap-alt { filter: none; }
+  .about-content:has(.alias:hover) .about-swap-default,
+  .about-content:has(.alias:focus) .about-swap-default { filter: none; }
 }

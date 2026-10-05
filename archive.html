@@ -18,7 +18,7 @@
   <link rel="alternate icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://example.github.io/feed.xml">
-  <script>(function(){try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <header class="site-header">
@@ -126,5 +126,6 @@
   </footer>
 
   <script src="js/main.js"></script>
+  <script src="js/enhance.js"></script>
 </body>
 </html>

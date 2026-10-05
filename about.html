@@ -19,7 +19,7 @@
   <link rel="alternate icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://example.github.io/feed.xml">
-  <script>(function(){try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <header class="site-header">
@@ -61,7 +61,7 @@
                禁用 JavaScript 也照常工作。
                ══════════════════════════════════════════════════════════════ -->
           <h2 class="hello-line">你好，我是 “
-            <span class="alias" tabindex="0">
+            <span class="alias" tabindex="0" aria-label="孟然君，英文名 Muroj">
               <!-- 悬浮时弹出的菜单（纯装饰，屏幕阅读器会跳过） -->
               <span class="alias-menu" aria-hidden="true">
                 <span class="alias-item">
@@ -145,5 +145,6 @@
   </footer>
 
   <script src="js/main.js"></script>
+  <script src="js/enhance.js"></script>
 </body>
 </html>

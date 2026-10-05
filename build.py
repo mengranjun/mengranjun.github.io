@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime as dt
 import html
+import json
 import math
 import re
 import sys
@@ -221,10 +222,20 @@ def _render_list(lines: list[str], i: int) -> tuple[str, int]:
     return "\n".join(parts), i
 
 
-def md_to_html(src: str) -> str:
+def _heading_id(text: str) -> str:
+    s = unicodedata.normalize("NFKC", text).strip().lower()
+    s = re.sub(r"[\s]+", "-", s)
+    s = re.sub(r"[^\w\u4e00-\u9fff-]+", "", s, flags=re.UNICODE)
+    s = re.sub(r"-{2,}", "-", s).strip("-")
+    return s
+
+
+def md_to_html(src: str, headings: list | None = None) -> str:
+    """Markdown → HTML。传入 headings 列表时，会把 h2/h3 的锚点收进去（用于生成目录）。"""
     lines = src.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     out: list[str] = []
     i, n = 0, len(lines)
+    used_ids: set[str] = set()
 
     while i < n:
         s = lines[i].strip()
@@ -264,7 +275,18 @@ def md_to_html(src: str) -> str:
         if m:
             lvl = len(m.group(1))
             lvl = 2 if lvl <= 2 else lvl
-            out.append("<h%d>%s</h%d>" % (lvl, inline(m.group(2)), lvl))
+            raw = m.group(2)
+            plain = re.sub(r"[*`~\[\]]|\(([^)]*)\)", lambda mm: mm.group(1) or "", raw)
+            attr = ""
+            if headings is not None and lvl in (2, 3):
+                hid = _heading_id(plain) or "section"
+                base, k = hid, 2
+                while hid in used_ids:
+                    hid, k = "%s-%d" % (base, k), k + 1
+                used_ids.add(hid)
+                headings.append((lvl, hid, plain))
+                attr = ' id="%s"' % hid
+            out.append("<h%d%s>%s</h%d>" % (lvl, attr, inline(raw), lvl))
             i += 1
             continue
 
@@ -419,6 +441,26 @@ AI_BADGE = (
 )
 
 
+def render_toc(headings: list) -> str:
+    """由 h2/h3 生成文章目录。少于两个标题就不生成。"""
+    if len(headings) < 2:
+        return ""
+    items = []
+    for lvl, hid, text in headings:
+        cls = ' class="toc-sub"' if lvl >= 3 else ""
+        items.append('          <li%s><a href="#%s">%s</a></li>'
+                     % (cls, hid, html.escape(text)))
+    return (
+        '<nav class="toc" aria-label="文章目录">\n'
+        '        <div class="toc-head">\n'
+        '          <span>目录</span>\n'
+        '          <span class="toc-count">%d 节</span>\n'
+        '        </div>\n'
+        '        <ol class="toc-list">\n%s\n        </ol>\n'
+        '      </nav>\n\n      ' % (len(headings), "\n".join(items))
+    )
+
+
 def head_block(title: str, description: str, prefix: str, url_path: str,
                og_type="website", og_title: str | None = None) -> str:
     full = SITE["url"].rstrip("/") + "/" + url_path.lstrip("/")
@@ -442,9 +484,10 @@ def head_block(title: str, description: str, prefix: str, url_path: str,
         '  <link rel="alternate icon" href="%sfavicon.ico" sizes="any">\n'
         '  <link rel="apple-touch-icon" href="%sapple-touch-icon.png">\n'
         '  <link rel="alternate" type="application/rss+xml" title="%s" href="%s/feed.xml">\n'
-        '  <script>(function(){try{var t=localStorage.getItem("blog-theme");'
+        '  <script>document.documentElement.className+=" js";'
+        'try{var t=localStorage.getItem("blog-theme");'
         'if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";'
-        'if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>'
+        'if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>'
         % (
             html.escape(title), desc, full, og_type, SITE["name"],
             ogt, desc, full, SITE["url"].rstrip("/"),
@@ -553,6 +596,10 @@ def render_post(p: dict, newer: dict | None, older: dict | None) -> str:
     meta += "          <span>%s</span>\n" % p["date"]
     meta += '          <span>·</span>\n          <span>约 %d 分钟读完</span>' % p["minutes"]
 
+    headings: list = []
+    body_html = md_to_html(p["body_md"], headings)
+    toc = render_toc(headings)
+
     return (
         "<!DOCTYPE html>\n"
         '<html lang="%s">\n'
@@ -565,12 +612,14 @@ def render_post(p: dict, newer: dict | None, older: dict | None) -> str:
         '        <div class="meta">\n%s\n        </div>\n'
         "        <h1>%s</h1>%s\n"
         "      </header>\n\n"
+        "      %s"
         '      <div class="article-body">\n%s\n      </div>\n\n'
         '      <nav class="article-nav">\n        %s\n        %s\n      </nav>\n'
         "    </article>\n"
         "  </main>\n\n"
         "  %s\n\n"
         '  <script src="../js/main.js"></script>\n'
+        '  <script src="../js/enhance.js"></script>\n'
         "</body>\n"
         "</html>\n"
         % (
@@ -582,7 +631,8 @@ def render_post(p: dict, newer: dict | None, older: dict | None) -> str:
             meta,
             html.escape(p["title"]),
             badge,
-            md_to_html(p["body_md"]),
+            toc,
+            body_html,
             left, right,
             footer_block("../"),
         )
@@ -607,6 +657,30 @@ def inject(path: Path, name: str, content: str, indent: str = "          ") -> b
     )
     path.write_text(new, encoding="utf-8", newline="\n")
     return True
+
+
+def build_search_index(posts: list[dict]) -> None:
+    """生成 js/search-index.js（用 JS 文件而不是 JSON，这样 file:// 直接打开也能搜索）。"""
+    items = []
+    for p in posts:
+        plain = re.sub(r"```.*?```", " ", p["body_md"], flags=re.S)
+        plain = re.sub(r"[#>*`\[\]()!|~-]", " ", plain)
+        plain = re.sub(r"\s+", " ", plain).strip()[:1500]
+        items.append({
+            "t": p["title"],
+            "u": "posts/%s.html" % p["slug"],
+            "d": p["date"],
+            "g": p["tags"],
+            "s": p["summary"],
+            "b": plain,
+            "ai": p["ai"],
+            "m": p["minutes"],
+        })
+    js = ("/* 由 build.py 自动生成，不要手改。用于站内搜索（Ctrl/Cmd + K）。 */\n"
+          "window.__SEARCH_INDEX__ = "
+          + json.dumps(items, ensure_ascii=False, separators=(",", ":"))
+          + ";\n")
+    (ROOT / "js" / "search-index.js").write_text(js, encoding="utf-8", newline="\n")
 
 
 def build_sitemap(posts: list[dict]) -> None:
@@ -707,7 +781,8 @@ def cmd_build() -> int:
 
     build_sitemap(posts)
     build_feed(posts)
-    print("生成 sitemap.xml、feed.xml")
+    build_search_index(posts)
+    print("生成 sitemap.xml、feed.xml、js/search-index.js")
     print("\n完成。本地预览：python -m http.server 8080")
     return 0
 

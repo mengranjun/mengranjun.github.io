@@ -18,7 +18,7 @@
   <link rel="alternate icon" href="../favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
   <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://example.github.io/feed.xml">
-  <script>(function(){try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <div class="progress-bar"></div>
@@ -56,10 +56,24 @@
         </span>
       </header>
 
-      <div class="article-body">
+      <nav class="toc" aria-label="文章目录">
+        <div class="toc-head">
+          <span>目录</span>
+          <span class="toc-count">5 节</span>
+        </div>
+        <ol class="toc-list">
+          <li><a href="#决策一css-变量做主题系统">决策一：CSS 变量做主题系统</a></li>
+          <li><a href="#决策二系统字体栈优先">决策二：系统字体栈优先</a></li>
+          <li><a href="#决策三动画只碰-gpu-属性">决策三：动画只碰 GPU 属性</a></li>
+          <li><a href="#决策四交互保持最小化">决策四：交互保持最小化</a></li>
+          <li><a href="#小结">小结</a></li>
+        </ol>
+      </nav>
+
+            <div class="article-body">
 <p>这个模板没有使用 React、Vue、Tailwind 或任何构建工具。整个站点的"依赖清单"是零。这不是复古情怀，而是一组经过权衡的工程决策。</p>
 
-<h2>决策一：CSS 变量做主题系统</h2>
+<h2 id="决策一css-变量做主题系统">决策一：CSS 变量做主题系统</h2>
 
 <p>深浅色主题切换听起来像是需要状态管理库的场景，实际上原生 CSS 自定义属性就足够。所有颜色定义在 <code>:root</code> 与 <code>[data-theme="dark"]</code> 两组变量里，切换主题只是切换 <code>html</code> 标签上的一个属性：</p>
 
@@ -75,19 +89,19 @@ body {
 }</code></pre>
 </div>
 
-<h2>决策二：系统字体栈优先</h2>
+<h2 id="决策二系统字体栈优先">决策二：系统字体栈优先</h2>
 
 <p>Web 字体是博客首屏最常见的性能杀手。模板使用系统字体栈——中文走苹方/微软雅黑，标题走 Georgia/宋体类衬线——零下载、零布局偏移，且在各平台上都有得体的观感。</p>
 
-<h2>决策三：动画只碰 GPU 属性</h2>
+<h2 id="决策三动画只碰-gpu-属性">决策三：动画只碰 GPU 属性</h2>
 
 <p>所有过渡动画只使用 <code>transform</code> 和 <code>opacity</code>，这两个属性由合成器处理，不触发重排重绘。配合 <code>prefers-reduced-motion</code> 媒体查询，照顾对动效敏感的用户。</p>
 
-<h2>决策四：交互保持最小化</h2>
+<h2 id="决策四交互保持最小化">决策四：交互保持最小化</h2>
 
 <p>全站 JavaScript 不到 100 行，只做四件事：主题切换、移动端菜单、阅读进度条、滚动渐入。没有框架意味着没有 hydration 成本、没有包体积焦虑，十年后这份代码依然能跑。</p>
 
-<h2>小结</h2>
+<h2 id="小结">小结</h2>
 
 <p>工具的价值取决于场景。对一个以阅读为核心的静态博客，原生 Web 平台提供的能力已经足够好，而"足够好"恰恰是最难做到的标准。</p>
       </div>
@@ -112,5 +126,6 @@ body {
   </footer>
 
   <script src="../js/main.js"></script>
+  <script src="../js/enhance.js"></script>
 </body>
 </html>
