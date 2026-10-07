@@ -9,8 +9,9 @@
    4. 命令面板 Ctrl / Cmd + K
    5. 文章目录的滚动高亮
    6. 首页标题打字机
-   7. 姓名彩蛋的「余韵」
+   7. 姓名彩蛋（多名字 + 滚轮切换）
    8. 回到顶部 + 阅读进度环
+   9. 继续阅读提示（记住上次读到哪）
    ========================================================================== */
 (function () {
   "use strict";
@@ -217,24 +218,211 @@
 
 
   /* ======================================================================
-     7. 姓名彩蛋的「余韵」：玩过一次之后记住这个选择
+     7. 姓名彩蛋：支持任意多个名字 +「余韵」
+     桌面端：悬浮展开菜单 → 滚轮在名字之间切换 → 鼠标移开菜单保持展开
+     移动端：点一下切到下一个名字
+     键盘  ：聚焦后 ↑ / ↓ 切换，Esc 收起
      ====================================================================== */
-  (function aliasAfterglow() {
-    var grid = $(".about-grid");
+  (function aliasSwitcher() {
     var alias = $(".alias");
-    if (!grid || !alias) return;
+    if (!alias) return;
 
-    var KEY = "muroj-alias-chosen";
+    var menu = $(".alias-menu", alias);
+    var opts = $$(".alias-opt", alias);
+    var names = $$(".alias-name", alias);
+    var stage = $(".alias-stage", alias);
+    var grid = $(".about-grid");
+    var n = Math.min(opts.length, names.length);
+    if (!menu || n < 1) return;
 
-    function mark() {
-      grid.classList.add("is-chosen");
-      try { sessionStorage.setItem(KEY, "1"); } catch (e) {}
+    var coarseMq = window.matchMedia ? window.matchMedia("(hover: none), (pointer: coarse)") : null;
+    var coarse = !!(coarseMq && coarseMq.matches);
+    var cur = 0;
+    var open = false;
+    var timer = null;
+    var CHOSEN = "muroj-alias-chosen";
+    var header = $(".site-header");
+
+    /* ---- 框宽跟随当前名字 ----
+       名字全部叠在同一格，舞台宽度本来会被「最长的名字」撑死。
+       这里逐个量出每个名字的真实宽度，切换时把当前宽度显式写到 stage 上，
+       配合 css/style.css 里 .alias-stage 的 width 过渡，外框平滑伸缩。 */
+    var stagePadX = 0;
+    var nameWidths = null;
+
+    function measureNames() {
+      if (!stage) return;
+      var ps = window.getComputedStyle(stage);
+      stagePadX = (parseFloat(ps.paddingLeft) || 0) + (parseFloat(ps.paddingRight) || 0);
+      nameWidths = names.map(function (el) {
+        var cs = window.getComputedStyle(el);
+        var probe = doc.createElement("span");
+        probe.style.position = "absolute";
+        probe.style.visibility = "hidden";
+        probe.style.whiteSpace = "nowrap";
+        probe.style.font = cs.font ||
+          (cs.fontStyle + " " + cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily);
+        probe.style.letterSpacing = cs.letterSpacing;
+        probe.textContent = el.textContent;
+        doc.body.appendChild(probe);
+        var w = probe.getBoundingClientRect().width;
+        doc.body.removeChild(probe);
+        return w;
+      });
     }
 
-    try { if (sessionStorage.getItem(KEY) === "1") grid.classList.add("is-chosen"); } catch (e) {}
+    function fitName() {
+      if (!stage || !nameWidths || !nameWidths[cur]) return;
+      // +1px 余量，避免个别字体下边缘像素被 overflow:hidden 裁掉
+      stage.style.width = Math.ceil(nameWidths[cur] + stagePadX + 1) + "px";
+    }
 
-    alias.addEventListener("pointerenter", mark, { once: true });
-    alias.addEventListener("focus", mark, { once: true });
+    // 纯拉丁字母的名字自动换成无衬线粗体，中文名保持衬线体
+    names.forEach(function (el) {
+      if (/^[\x20-\x7E]+$/.test(el.textContent.trim())) el.classList.add("is-latin");
+    });
+
+    /* 名字贴着置顶导航时，菜单往上弹会被挡住 —— 量一下上方还剩多少空间，
+       不够就翻到名字下面去。 */
+    function placeMenu() {
+      var room = alias.getBoundingClientRect().top -
+                 (header ? header.getBoundingClientRect().bottom : 0);
+      alias.classList.toggle("is-flip", room < menu.offsetHeight + 26);
+    }
+
+    function render() {
+      menu.style.setProperty("--sel", cur);
+      opts.forEach(function (o, i) { o.classList.toggle("is-on", i === cur); });
+      names.forEach(function (el, i) {
+        var off = i - cur;
+        el.style.setProperty("--off", off);
+        el.classList.toggle("is-on", off === 0);
+      });
+      // 描述跟着「当前选中的名字」走，而不是跟着「菜单开着」走
+      alias.classList.toggle("is-alt", cur > 0);
+      fitName();   // 外框宽度跟着当前名字走
+    }
+
+    function setOpen(v) {
+      open = v;
+      if (v) placeMenu();
+      alias.classList.toggle("is-open", v);
+    }
+
+    function select(i) {
+      if (i < 0 || i >= n || i === cur) return false;
+      cur = i;
+      render();
+      if (fitSwap) window.setTimeout(fitSwap, 320);   // 描述容器高度跟着当前那一段
+      return true;
+    }
+
+    function markChosen() {
+      if (grid) grid.classList.add("is-chosen");
+      try { sessionStorage.setItem(CHOSEN, "1"); } catch (e) {}
+    }
+
+    try { if (grid && sessionStorage.getItem(CHOSEN) === "1") grid.classList.add("is-chosen"); } catch (e) {}
+
+    /* ---- 让描述容器的高度跟随当前显示的那一段（方案 B 专用）---- */
+    var fitSwap = null;
+    var swap = $(".about-swap");
+    if (swap) {
+      var kids = Array.prototype.filter.call(swap.children, function (nd) { return nd.nodeType === 1; });
+      var altIdx = -1;
+      kids.forEach(function (nd, i) {
+        if (nd.classList && nd.classList.contains("about-swap-alt")) altIdx = i;
+      });
+      if (altIdx > 0) {
+        swap.style.overflow = "hidden";
+        swap.style.transition = "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)";
+        fitSwap = function () {
+          var el = kids[alias.classList.contains("is-alt") ? altIdx : 0];
+          if (!el) return;
+          var mb = parseFloat(window.getComputedStyle(el).marginBottom) || 0;
+          swap.style.height = Math.round(el.getBoundingClientRect().height + mb) + "px";
+        };
+        fitSwap();
+        window.addEventListener("resize", fitSwap);
+        if (doc.fonts && doc.fonts.ready && doc.fonts.ready.then) {
+          doc.fonts.ready.then(function () { fitSwap(); }).catch(function () {});
+        }
+      }
+    }
+
+    measureNames();
+    render();
+
+    /* 字体加载完成 / 窗口尺寸变化后，名字宽度可能变，重新量一遍 */
+    window.addEventListener("resize", function () { measureNames(); fitName(); });
+    if (doc.fonts && doc.fonts.ready && doc.fonts.ready.then) {
+      doc.fonts.ready.then(function () { measureNames(); fitName(); }).catch(function () {});
+    }
+
+    /* ---- 滚动 / 改窗口大小时重新判断菜单该往上还是往下弹 ---- */
+    var placeQueued = false;
+    function queuePlace() {
+      if (!open || placeQueued) return;
+      placeQueued = true;
+      raf(function () { placeQueued = false; placeMenu(); });
+    }
+    window.addEventListener("scroll", queuePlace, { passive: true });
+    window.addEventListener("resize", placeMenu);
+    placeMenu();
+
+    /* ---- 桌面：悬浮展开，且不因鼠标移开而收起 ---- */
+    if (!coarse) {
+      alias.addEventListener("pointerenter", function () {
+        setOpen(true);
+        markChosen();
+      });
+    }
+
+    /* ---- 滚轮切换名字 ---- */
+    alias.addEventListener("wheel", function (e) {
+      if (coarse || !open) return;
+      var dir = e.deltaY > 0 ? 1 : -1;
+      // 已经滚到列表两端就放行，让页面正常滚动，别把用户"卡"在这里
+      if (!select(cur + dir)) return;
+      e.preventDefault();
+    }, { passive: false });
+
+    /* ---- 移动端：点一下切到下一个（循环） ---- */
+    alias.addEventListener("click", function (e) {
+      if (!coarse) return;
+      e.preventDefault();
+      select((cur + 1) % n);
+      setOpen(true);
+      markChosen();
+      clearTimeout(timer);
+      timer = setTimeout(function () { setOpen(false); }, 2200);
+    });
+
+    /* ---- 键盘 ---- */
+    alias.addEventListener("keydown", function (e) {
+      var k = e.key;
+      if (k === "ArrowDown" || k === "ArrowRight" || k === "Enter" || k === " ") {
+        e.preventDefault();
+        setOpen(true);
+        markChosen();
+        select(cur + 1 < n ? cur + 1 : 0);
+      } else if (k === "ArrowUp" || k === "ArrowLeft") {
+        e.preventDefault();
+        setOpen(true);
+        markChosen();
+        select(cur - 1 >= 0 ? cur - 1 : n - 1);
+      }
+    });
+
+    /* ---- Esc / 点击别处 收起 ---- */
+    doc.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && open) setOpen(false);
+    });
+    doc.addEventListener("click", function (e) {
+      if (!open) return;
+      if (e.target === alias || alias.contains(e.target)) return;
+      setOpen(false);
+    });
   })();
 
 
@@ -501,6 +689,62 @@
       var toggle = $(".theme-toggle", nav);
       nav.insertBefore(b, toggle || null);
     }
+  })();
+
+
+  /* ======================================================================
+     9. 继续阅读：记住上次读到哪，回来时给一个「继续阅读」的提示
+     不自动跳转 —— 强行滚动页面比不恢复更烦人。
+     ====================================================================== */
+  (function resumeReading() {
+    var body = $(".article-body");
+    var hud = $(".progress-bar");
+    if (!body || !hud) return;              // 只在文章页生效
+
+    var KEY = "muroj-read:" + location.pathname;
+    var save = null;
+    try { save = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) {}
+
+    var queued = false;
+    function remember() {
+      var d = doc.documentElement;
+      var total = d.scrollHeight - d.clientHeight;
+      if (total < 400) return;
+      var pct = Math.round((window.pageYOffset / total) * 100);
+      try { localStorage.setItem(KEY, JSON.stringify({ p: pct, t: Date.now() })); } catch (e) {}
+    }
+
+    window.addEventListener("scroll", function () {
+      if (queued) return;
+      queued = true;
+      raf(function () { queued = false; remember(); });
+    }, { passive: true });
+
+    // 刚写过不到 5 秒就刷新（比如误按 F5）不弹提示
+    if (!save || typeof save.p !== "number" || save.p < 8 || save.p > 92) return;
+    if (Date.now() - (save.t || 0) < 5000) return;
+
+    var box = doc.createElement("div");
+    box.className = "resume";
+    box.setAttribute("role", "status");
+    box.innerHTML =
+      '<span class="resume-text">上次读到 <b>' + save.p + '%</b></span>' +
+      '<button class="resume-btn" type="button">继续阅读</button>' +
+      '<button class="resume-close" type="button" aria-label="关闭提示">&times;</button>';
+    doc.body.appendChild(box);
+
+    function hide() { box.classList.remove("show"); window.setTimeout(function () { box.remove(); }, 400); }
+
+    $(".resume-btn", box).addEventListener("click", function () {
+      var d = doc.documentElement;
+      var total = d.scrollHeight - d.clientHeight;
+      window.scrollTo({ top: total * save.p / 100, behavior: reduced ? "auto" : "smooth" });
+      hide();
+    });
+    $(".resume-close", box).addEventListener("click", hide);
+
+    window.setTimeout(function () { box.classList.add("show"); }, 700);
+    window.setTimeout(hide, 14000);
   })();
 
 })();

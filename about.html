@@ -6,20 +6,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>关于 — MurojBlog</title>
   <meta name="description" content="关于 MurojBlog 与博主孟然君：个人介绍、联系方式，以及这个站点的构建方式。">
-  <link rel="canonical" href="https://example.github.io/about.html">
+  <link rel="canonical" href="https://mengranjun.github.io/about.html">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="MurojBlog">
   <meta property="og:title" content="关于 — MurojBlog">
   <meta property="og:description" content="关于 MurojBlog 与博主孟然君：个人介绍、联系方式，以及这个站点的构建方式。">
-  <meta property="og:url" content="https://example.github.io/about.html">
-  <meta property="og:image" content="https://example.github.io/og-image.png">
+  <meta property="og:url" content="https://mengranjun.github.io/about.html">
+  <meta property="og:image" content="https://mengranjun.github.io/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://example.github.io/feed.xml">
-  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://mengranjun.github.io/feed.xml">
+  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t){var h=new Date().getHours();t=(h>=7&&h<19)?"light":"dark";}document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <header class="site-header">
@@ -51,34 +51,42 @@
         <div class="about-content">
 
           <!-- ══════════════════════════════════════════════════════════════
-               姓名彩蛋 By DSH
-               把鼠标放到「孟然君」上（键盘 Tab 聚焦、手机上点一下也可以）：
-                 ① 上方拉出菜单，复选框亮起
-                 ② 复选框画出对勾，选中 Muroj
-                 ③ 中文名向上滚出，英文名 Muroj 从下方滚入顶替
-                 ④ 下方描述跟着替换（见「方案 B」）
-               样式在 css/style.css 里搜索「姓名彩蛋」。全部由 CSS 驱动，
-               禁用 JavaScript 也照常工作。
+               姓名彩蛋 · 支持任意多个名字
+               ── 桌面端：鼠标移到名字上 → 菜单展开、复选框亮起并打勾；
+                        滚轮上/下 → 复选框在名字之间滑动，显示的名字跟着切换；
+                        鼠标移开后菜单「保持展开」，按 Esc 或点别处才收起。
+               ── 移动端：点一下名字就切换到下一个（循环）。
+               ── 键盘：Tab 聚焦后按 ↑ / ↓ 也能切换。
+               ▶ 想再加一个名字，只改两个地方，顺序一一对应即可：
+                 ① .alias-list 里加一行 <span class="alias-opt">新名字</span>
+                 ② .alias-stage 里加一行 <span class="alias-name">新名字</span>
+                 中文名自动用衬线体，纯英文名自动用无衬线粗体，不用手动设置。
+               样式在 css/style.css 搜索「姓名彩蛋」。
                ══════════════════════════════════════════════════════════════ -->
           <h2 class="hello-line">你好，我是 “
-            <span class="alias" tabindex="0" aria-label="孟然君，英文名 Muroj">
-              <!-- 悬浮时弹出的菜单（纯装饰，屏幕阅读器会跳过） -->
+            <span class="alias" tabindex="0" aria-label="孟然君，又名 Muroj">
+              <!-- 展开时弹出的菜单：一列名字 + 一个会滑动的复选框 -->
               <span class="alias-menu" aria-hidden="true">
-                <span class="alias-item">
-                  <svg class="alias-check" viewBox="0 0 20 20" aria-hidden="true">
+                <span class="alias-check">
+                  <svg viewBox="0 0 20 20">
                     <rect class="alias-check-box" x="1.6" y="1.6" width="16.8" height="16.8" rx="4.8"/>
                     <path class="alias-check-tick" d="M5.7 10.5l3.1 3.1 5.8-6.4"/>
                   </svg>
-                  <span class="alias-item-text">Muroj</span>
                 </span>
-                <span class="alias-menu-arrow" aria-hidden="true"></span>
+                <span class="alias-list">
+                  <span class="alias-opt">孟然君</span>
+                  <span class="alias-opt">Muroj</span>
+                </span>
+                <span class="alias-menu-arrow"></span>
               </span>
-              <!-- 名字本体：中英文两版叠在同一格，靠 CSS 上下滚动切换 -->
-              <span class="alias-stage">
-                <span class="alias-cn" aria-hidden="true">孟然君</span>
-                <span class="alias-en" aria-hidden="true">Muroj</span>
+              <!-- 名字本体：全部叠在同一格，靠 CSS 上下滚动切换 -->
+              <span class="alias-stage" aria-hidden="true">
+                <span class="alias-name">孟然君</span>
+                <span class="alias-name">Muroj</span>
               </span>
             </span>”
+            <!-- 名字旁边的操作提示：菜单展开时淡入 -->
+            <span class="alias-hint" aria-hidden="true">滑动滚轮或再次点击鼠标以显示更多！</span>
           </h2>
 
           <!-- ══════════════════════════════════════════════════════════════
@@ -93,7 +101,7 @@
                ══════════════════════════════════════════════════════════════ -->
           <div class="about-swap">
             <p class="about-swap-default">「孟然君」是我“绞尽脑汁”想出来的网名。最开始叫“孟然”，后面才在末尾加上了“君”。没有什么特别含义，只是觉得它很适合我罢了。</p>
-            <p class="about-swap-alt" aria-hidden="true">「Muroj」是我根据「孟然君」的读音来给自己取的英文名。之前的英文名有叫过“mengranjun”，不过它显得冗长。「Muroj」相比便更“短”。两个名字，指的是同一具灵魂。</p>
+            <p class="about-swap-alt" aria-hidden="true">「Muroj」是我根据「孟然君」的读音来给自己取的英文名。之前的英文名有叫过“mengranjun”，现在的Github以及部分平台还保留着这名字，因为它显得太过冗长才更换的。「Muroj」相比“mengranjun”长度更“短”，看着更舒服些。两个名字，指的是同一具灵魂。</p>
           </div>
 
           <!-- ══════════════════════════════════════════════════════════════
@@ -104,9 +112,10 @@
                  1) 把上面「方案 B」的整个 div.about-swap 用注释符号包起来；
                  2) 把下面 about-extra 那个 p 的注释符号删掉。
                ══════════════════════════════════════════════════════════════ -->
-          <!--
-          <p class="about-extra">这里是悬浮后才出现的新描述。可以写一句只有把鼠标放到名字上才看得到的话——比如这个英文名的来历。</p>
-          -->
+
+<!--          <p class="about-extra-default">「孟然君」是我“绞尽脑汁”想出来的网名。最开始叫“孟然”，后面才在末尾加上了“君”。没有什么特别含义，只是觉得它很适合我罢了。</p>-->
+<!--          <p class="about-extra">「Muroj」是我根据「孟然君」的读音来给自己取的英文名。之前的英文名有叫过“mengranjun”，现在的Github以及部分平台还保留着这名字，因为它显得太过冗长才更换的。「Muroj」相比“mengranjun”长度更“短”，看着更舒服些。两个名字，指的是同一具灵魂</p>-->
+
 
           <p>我只是一个无聊的人罢了，整个博客的诞生，只不过是为了满足一个幼稚之人渴望追求个性、追求小众、追求被其他人看见的幻想罢了。</p>
           <p>在这个地方，我会畅所欲言，将自己的想法和观点，分享给虚无。换言之——积累自己不同时期的想法。</p>

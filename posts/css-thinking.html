@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>少即是多：不写一行框架代码的博客设计思考 — MurojBlog</title>
   <meta name="description" content="当所有工具都在劝你引入依赖时，我选择回归 CSS 变量与原生 Web 平台。这篇文章记录了模板的设计决策。">
-  <link rel="canonical" href="https://example.github.io/posts/css-thinking.html">
+  <link rel="canonical" href="https://mengranjun.github.io/posts/css-thinking.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="MurojBlog">
   <meta property="og:title" content="少即是多：不写一行框架代码的博客设计思考">
   <meta property="og:description" content="当所有工具都在劝你引入依赖时，我选择回归 CSS 变量与原生 Web 平台。这篇文章记录了模板的设计决策。">
-  <meta property="og:url" content="https://example.github.io/posts/css-thinking.html">
-  <meta property="og:image" content="https://example.github.io/og-image.png">
+  <meta property="og:url" content="https://mengranjun.github.io/posts/css-thinking.html">
+  <meta property="og:image" content="https://mengranjun.github.io/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="../css/style.css">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="../favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
-  <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://example.github.io/feed.xml">
-  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://mengranjun.github.io/feed.xml">
+  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t){var h=new Date().getHours();t=(h>=7&&h<19)?"light":"dark";}if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <div class="progress-bar"></div>
@@ -49,7 +49,7 @@
           <span>·</span>
           <span>约 3 分钟读完</span>
         </div>
-        <h1>少即是多：不写一行框架代码的博客设计思考</h1>
+        <h1 style="view-transition-name:post-994d57c634">少即是多：不写一行框架代码的博客设计思考</h1>
         <span class="ai-notice" title="本文内容由 AI 生成，仅供参考">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg>
           <span>由AI生成</span>
@@ -78,15 +78,15 @@
 <p>深浅色主题切换听起来像是需要状态管理库的场景，实际上原生 CSS 自定义属性就足够。所有颜色定义在 <code>:root</code> 与 <code>[data-theme="dark"]</code> 两组变量里，切换主题只是切换 <code>html</code> 标签上的一个属性：</p>
 
 <div class="code-block">
-  <button class="copy-btn">复制</button>
-<pre><code class="language-css">:root { --bg: #f4f9fb; --text: #1b2a31; }
-[data-theme="dark"] { --bg: #0c1418; --text: #c2d2d9; }
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  transition: background-color 0.3s ease;
-}</code></pre>
+  <button class="copy-btn" type="button">复制</button>
+<pre><code class="language-css"><span class="cl"><span class="cl-n" aria-hidden="true">1</span>:root { <span class="tk tk-p">--bg</span>: #f4f9fb; <span class="tk tk-p">--text</span>: #1b2a31; }</span>
+<span class="cl"><span class="cl-n" aria-hidden="true">2</span>[data-theme=<span class="tk tk-s">"dark"</span>] { <span class="tk tk-p">--bg</span>: #0c1418; <span class="tk tk-p">--text</span>: #c2d2d9; }</span>
+<span class="cl"><span class="cl-n" aria-hidden="true">3</span></span>
+<span class="cl"><span class="cl-n" aria-hidden="true">4</span>body {</span>
+<span class="cl"><span class="cl-n" aria-hidden="true">5</span>  background: var(--bg);</span>
+<span class="cl"><span class="cl-n" aria-hidden="true">6</span>  color: var(--text);</span>
+<span class="cl"><span class="cl-n" aria-hidden="true">7</span>  transition: background-color <span class="tk tk-n">0.3s</span> ease;</span>
+<span class="cl"><span class="cl-n" aria-hidden="true">8</span>}</span></code></pre>
 </div>
 
 <h2 id="决策二系统字体栈优先">决策二：系统字体栈优先</h2>

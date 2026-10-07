@@ -1,35 +1,63 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://example.github.io/</loc>
+    <loc>https://mengranjun.github.io/</loc>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://example.github.io/archive.html</loc>
+    <loc>https://mengranjun.github.io/archive.html</loc>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://example.github.io/about.html</loc>
+    <loc>https://mengranjun.github.io/about.html</loc>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://example.github.io/posts/AI是什么.html</loc>
+    <loc>https://mengranjun.github.io/posts/AI是什么.html</loc>
     <lastmod>2026-10-03</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://example.github.io/posts/github-pages-guide.html</loc>
+    <loc>https://mengranjun.github.io/posts/github-pages-guide.html</loc>
     <lastmod>2026-10-02</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://example.github.io/posts/css-thinking.html</loc>
+    <loc>https://mengranjun.github.io/posts/css-thinking.html</loc>
     <lastmod>2026-09-28</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://example.github.io/posts/hello-world.html</loc>
+    <loc>https://mengranjun.github.io/posts/hello-world.html</loc>
     <lastmod>2026-09-20</lastmod>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://mengranjun.github.io/tags/index.html</loc>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://mengranjun.github.io/tags/随笔.html</loc>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://mengranjun.github.io/tags/ai.html</loc>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://mengranjun.github.io/tags/部署.html</loc>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://mengranjun.github.io/tags/github.html</loc>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://mengranjun.github.io/tags/前端.html</loc>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://mengranjun.github.io/tags/设计.html</loc>
+    <priority>0.4</priority>
   </url>
 </urlset>

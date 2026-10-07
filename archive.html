@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>归档 — MurojBlog</title>
   <meta name="description" content="MurojBlog 全部文章归档，按时间倒序，支持标签筛选。">
-  <link rel="canonical" href="https://example.github.io/archive.html">
+  <link rel="canonical" href="https://mengranjun.github.io/archive.html">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="MurojBlog">
   <meta property="og:title" content="归档 — MurojBlog">
   <meta property="og:description" content="MurojBlog 全部文章归档，按时间倒序，支持标签筛选。">
-  <meta property="og:url" content="https://example.github.io/archive.html">
-  <meta property="og:image" content="https://example.github.io/og-image.png">
+  <meta property="og:url" content="https://mengranjun.github.io/archive.html">
+  <meta property="og:image" content="https://mengranjun.github.io/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://example.github.io/feed.xml">
-  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://mengranjun.github.io/feed.xml">
+  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t){var h=new Date().getHours();t=(h>=7&&h<19)?"light":"dark";}document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <header class="site-header">
@@ -50,6 +50,35 @@
         </div>
       </div>
 
+      <!-- 写作热力图（由 build.py 生成） -->
+      <!-- BUILD:HEATMAP:START -->
+        <div class="heatmap">
+                  <div class="heatmap-head">
+                    <span>写作热力图</span>
+                    <span class="heatmap-sum">4 篇 · 2 个月有更新</span>
+                  </div>
+                  <div class="heatmap-grid">
+                    <span class="hm-year"></span>
+                    <span class="hm-m">1</span><span class="hm-m">2</span><span class="hm-m">3</span><span class="hm-m">4</span><span class="hm-m">5</span><span class="hm-m">6</span><span class="hm-m">7</span><span class="hm-m">8</span><span class="hm-m">9</span><span class="hm-m">10</span><span class="hm-m">11</span><span class="hm-m">12</span>
+                    <span class="hm-total"></span>
+                <span class="hm-year">2026</span>
+                <span class="hm-cell" data-lv="0" title="2026 年 1 月 · 0 篇"></span>
+                <span class="hm-cell" data-lv="0" title="2026 年 2 月 · 0 篇"></span>
+                <span class="hm-cell" data-lv="0" title="2026 年 3 月 · 0 篇"></span>
+                <span class="hm-cell" data-lv="0" title="2026 年 4 月 · 0 篇"></span>
+                <span class="hm-cell" data-lv="0" title="2026 年 5 月 · 0 篇"></span>
+                <span class="hm-cell" data-lv="0" title="2026 年 6 月 · 0 篇"></span>
+                <span class="hm-cell" data-lv="0" title="2026 年 7 月 · 0 篇"></span>
+                <span class="hm-cell" data-lv="0" title="2026 年 8 月 · 0 篇"></span>
+                <span class="hm-cell" data-lv="4" title="2026 年 9 月 · 2 篇"></span>
+                <span class="hm-cell" data-lv="4" title="2026 年 10 月 · 2 篇"></span>
+                <span class="hm-cell" data-lv="0" title="2026 年 11 月 · 0 篇"></span>
+                <span class="hm-cell" data-lv="0" title="2026 年 12 月 · 0 篇"></span>
+                <span class="hm-total">4</span>
+                  </div>
+                </div>
+        <!-- BUILD:HEATMAP:END -->
+
       <div class="filter-bar" role="group" aria-label="按标签筛选">
         <!-- BUILD:FILTERS:START -->
         <button class="filter-btn active" data-tag="all" aria-pressed="true">全部</button>
@@ -69,7 +98,7 @@
                   <div>
                     <h3><a href="posts/AI是什么.html">AI是什么</a></h3>
                     <p>记录我对 AI 的一些想法：它到底起到了什么作用，以及我们该怎样和它相处。</p>
-                    <div class="meta-tags"><span class="tag">随笔</span><span class="tag">AI</span></div>
+                    <div class="meta-tags"><a class="tag" href="tags/随笔.html">随笔</a><a class="tag" href="tags/ai.html">AI</a></div>
                   </div>
                 </li>
         <li data-tags="部署,GitHub">
@@ -81,7 +110,7 @@
                       <span>由AI生成</span>
                     </span>
                     <p>从注册账号到推送代码、开启 Pages 服务，完整走通一次静态站点部署流程，并解释它为什么适合个人博客。</p>
-                    <div class="meta-tags"><span class="tag">部署</span><span class="tag">GitHub</span></div>
+                    <div class="meta-tags"><a class="tag" href="tags/部署.html">部署</a><a class="tag" href="tags/github.html">GitHub</a></div>
                   </div>
                 </li>
         <li data-tags="前端,设计">
@@ -93,7 +122,7 @@
                       <span>由AI生成</span>
                     </span>
                     <p>当所有工具都在劝你引入依赖时，我选择回归 CSS 变量与原生 Web 平台。这篇文章记录了模板的设计决策。</p>
-                    <div class="meta-tags"><span class="tag">前端</span><span class="tag">设计</span></div>
+                    <div class="meta-tags"><a class="tag" href="tags/前端.html">前端</a><a class="tag" href="tags/设计.html">设计</a></div>
                   </div>
                 </li>
         <li data-tags="随笔">
@@ -105,7 +134,7 @@
                       <span>由AI生成</span>
                     </span>
                     <p>时隔多年重新提笔。聊聊写作的意义、信息降噪，以及为什么把站点安在 GitHub 上。</p>
-                    <div class="meta-tags"><span class="tag">随笔</span></div>
+                    <div class="meta-tags"><a class="tag" href="tags/随笔.html">随笔</a></div>
                   </div>
                 </li>
         <!-- BUILD:ARCHIVE:END -->

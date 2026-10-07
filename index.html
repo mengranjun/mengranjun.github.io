@@ -18,7 +18,7 @@
   <link rel="alternate icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://mengranjun.github.io/feed.xml">
-  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t){var h=new Date().getHours();t=(h>=7&&h<19)?"light":"dark";}document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <header class="site-header">
@@ -60,14 +60,14 @@
         </div>
         <div class="card-grid">
           <!-- BUILD:POSTS:START -->
-          <article class="post-card reveal">
+          <article class="post-card reveal" style="view-transition-name:post-496b7e7222">
                       <div class="card-top"><span class="tag">随笔</span><span>2026-10-03</span></div>
                       <h3><a href="posts/AI是什么.html">AI是什么</a></h3>
-                      <p>记录了一些我对 AI 的一些想法，目前还没写完。</p>
+                      <p>记录我对 AI 的一些想法：它到底起到了什么作用，以及我们该怎样和它相处。</p>
                       <div class="card-foot"><span>约 1 分钟读完</span><a class="read-more" href="posts/AI是什么.html">阅读全文 →</a></div>
                     </article>
 
-          <article class="post-card reveal">
+          <article class="post-card reveal" style="view-transition-name:post-5fb24acbc2">
                       <div class="card-top"><span class="tag">部署</span><span>2026-10-02</span></div>
                       <h3><a href="posts/github-pages-guide.html">零成本上线：用 GitHub Pages 托管个人博客</a></h3>
                       <span class="ai-notice" title="本文内容由 AI 生成，仅供参考">
@@ -78,7 +78,7 @@
                       <div class="card-foot"><span>约 3 分钟读完</span><a class="read-more" href="posts/github-pages-guide.html">阅读全文 →</a></div>
                     </article>
 
-          <article class="post-card reveal">
+          <article class="post-card reveal" style="view-transition-name:post-994d57c634">
                       <div class="card-top"><span class="tag">前端</span><span>2026-09-28</span></div>
                       <h3><a href="posts/css-thinking.html">少即是多：不写一行框架代码的博客设计思考</a></h3>
                       <span class="ai-notice" title="本文内容由 AI 生成，仅供参考">
@@ -96,7 +96,7 @@
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <span>© <span data-year>2026</span> MurojBlog · Powered by GitHub Pages · 2026/10/07-14:40-HM</span>
+      <span>© <span data-year>2026</span> MurojBlog · Powered by GitHub Pages · 26.10.07.19.50--4+1+7</span>
       <div class="footer-links">
         <a href="archive.html">归档</a>
         <a href="about.html">关于</a>

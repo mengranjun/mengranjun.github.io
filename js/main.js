@@ -6,6 +6,23 @@
   var mq = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
   var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  /* ---------- 按时间自动切换深浅色 ----------
+     THEME_AUTO_BY_TIME = true  → 白天浅色、夜里深色（默认）
+                          = false → 改回跟随系统设置
+     下面两个数字是「白天」的小时区间，注意要和各页面 <head> 里
+     那段内联脚本保持一致（搜索结果里搜 "autoTheme" 就能找到）。 */
+  var THEME_AUTO_BY_TIME = true;
+  var DAY_START = 7;    // 7:00 起算白天
+  var DAY_END = 19;     // 19:00 起算夜里
+
+  function preferredTheme() {
+    if (THEME_AUTO_BY_TIME) {
+      var h = new Date().getHours();
+      return (h >= DAY_START && h < DAY_END) ? "light" : "dark";
+    }
+    return (mq && mq.matches) ? "dark" : "light";
+  }
+
   /* ---------- Theme ----------
      The real no-flash initialisation lives in a tiny inline <script> in
      each page's <head>; this is only a safety net if that is missing. */
@@ -13,8 +30,7 @@
   try { stored = localStorage.getItem("blog-theme"); } catch (e) {}
 
   if (!root.getAttribute("data-theme")) {
-    if (stored) root.setAttribute("data-theme", stored);
-    else if (mq && mq.matches) root.setAttribute("data-theme", "dark");
+    root.setAttribute("data-theme", stored || preferredTheme());
   }
 
   function isDark() { return root.getAttribute("data-theme") === "dark"; }
@@ -32,6 +48,7 @@
     var apply = function () {
       root.setAttribute("data-theme", next);
       try { localStorage.setItem("blog-theme", next); } catch (e) {}
+      stored = next;                    // 手动选过之后，自动切换就不再干预
       syncThemeButtons();
     };
 
@@ -57,8 +74,24 @@
     if (vt.finished && vt.finished.catch) vt.finished.catch(function () {});
   }
 
-  // Follow the system only while the reader has not made an explicit choice.
-  if (mq && mq.addEventListener) {
+  // 读者没手动选过时：按时间自动切换；手动选过就完全听读者的。
+  function autoTheme() {
+    if (stored) return;
+    var want = preferredTheme();
+    if (root.getAttribute("data-theme") !== want) {
+      root.setAttribute("data-theme", want);
+      syncThemeButtons();
+    }
+  }
+
+  if (THEME_AUTO_BY_TIME) {
+    autoTheme();
+    window.setInterval(autoTheme, 10 * 60 * 1000);          // 每 10 分钟看一眼
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) autoTheme();                     // 切回标签页时也看一眼
+    });
+  } else if (mq && mq.addEventListener) {
+    // 跟随系统时，系统主题变了要跟着变
     mq.addEventListener("change", function (e) {
       if (stored) return;
       root.setAttribute("data-theme", e.matches ? "dark" : "light");
@@ -77,7 +110,12 @@
     if (copyBtn) {
       var code = copyBtn.parentElement.querySelector("code");
       if (code && navigator.clipboard) {
-        navigator.clipboard.writeText(code.innerText).then(function () {
+        // 行号在 .cl-n 里，复制前先从克隆节点里摘掉，别混进剪贴板
+        var clone = code.cloneNode(true);
+        Array.prototype.forEach.call(clone.querySelectorAll(".cl-n"), function (n) {
+          if (n.parentNode) n.parentNode.removeChild(n);
+        });
+        navigator.clipboard.writeText(clone.textContent).then(function () {
           copyBtn.textContent = "已复制";
           setTimeout(function () { copyBtn.textContent = "复制"; }, 1600);
         }).catch(function () {

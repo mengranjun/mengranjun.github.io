@@ -2,36 +2,36 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>MurojBlog</title>
-    <link>https://example.github.io/</link>
+    <link>https://mengranjun.github.io/</link>
     <description>MurojBlog —— 孟然君的个人博客。写技术，也写想法和日常；内容用 Markdown 书写，站点托管在 GitHub Pages 上。</description>
     <language>zh-CN</language>
-    <atom:link href="https://example.github.io/feed.xml" rel="self" type="application/rss+xml"/>
+    <atom:link href="https://mengranjun.github.io/feed.xml" rel="self" type="application/rss+xml"/>
     <lastBuildDate>Sat, 03 Oct 2026 00:00:00 +0800</lastBuildDate>
     <item>
       <title>AI是什么</title>
-      <link>https://example.github.io/posts/AI是什么.html</link>
-      <guid isPermaLink="true">https://example.github.io/posts/AI是什么.html</guid>
+      <link>https://mengranjun.github.io/posts/AI是什么.html</link>
+      <guid isPermaLink="true">https://mengranjun.github.io/posts/AI是什么.html</guid>
       <pubDate>Sat, 03 Oct 2026 00:00:00 +0800</pubDate>
       <description>记录我对 AI 的一些想法：它到底起到了什么作用，以及我们该怎样和它相处。</description>
     </item>
     <item>
       <title>零成本上线：用 GitHub Pages 托管个人博客</title>
-      <link>https://example.github.io/posts/github-pages-guide.html</link>
-      <guid isPermaLink="true">https://example.github.io/posts/github-pages-guide.html</guid>
+      <link>https://mengranjun.github.io/posts/github-pages-guide.html</link>
+      <guid isPermaLink="true">https://mengranjun.github.io/posts/github-pages-guide.html</guid>
       <pubDate>Fri, 02 Oct 2026 00:00:00 +0800</pubDate>
       <description>从注册账号到推送代码、开启 Pages 服务，完整走通一次静态站点部署流程，并解释它为什么适合个人博客。</description>
     </item>
     <item>
       <title>少即是多：不写一行框架代码的博客设计思考</title>
-      <link>https://example.github.io/posts/css-thinking.html</link>
-      <guid isPermaLink="true">https://example.github.io/posts/css-thinking.html</guid>
+      <link>https://mengranjun.github.io/posts/css-thinking.html</link>
+      <guid isPermaLink="true">https://mengranjun.github.io/posts/css-thinking.html</guid>
       <pubDate>Mon, 28 Sep 2026 00:00:00 +0800</pubDate>
       <description>当所有工具都在劝你引入依赖时，我选择回归 CSS 变量与原生 Web 平台。这篇文章记录了模板的设计决策。</description>
     </item>
     <item>
       <title>Hello World：为什么我又开始写博客了</title>
-      <link>https://example.github.io/posts/hello-world.html</link>
-      <guid isPermaLink="true">https://example.github.io/posts/hello-world.html</guid>
+      <link>https://mengranjun.github.io/posts/hello-world.html</link>
+      <guid isPermaLink="true">https://mengranjun.github.io/posts/hello-world.html</guid>
       <pubDate>Sun, 20 Sep 2026 00:00:00 +0800</pubDate>
       <description>时隔多年重新提笔。聊聊写作的意义、信息降噪，以及为什么把站点安在 GitHub 上。</description>
     </item>

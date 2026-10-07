@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>零成本上线：用 GitHub Pages 托管个人博客 — MurojBlog</title>
   <meta name="description" content="从注册账号到推送代码、开启 Pages 服务，完整走通一次静态站点部署流程，并解释它为什么适合个人博客。">
-  <link rel="canonical" href="https://example.github.io/posts/github-pages-guide.html">
+  <link rel="canonical" href="https://mengranjun.github.io/posts/github-pages-guide.html">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="MurojBlog">
   <meta property="og:title" content="零成本上线：用 GitHub Pages 托管个人博客">
   <meta property="og:description" content="从注册账号到推送代码、开启 Pages 服务，完整走通一次静态站点部署流程，并解释它为什么适合个人博客。">
-  <meta property="og:url" content="https://example.github.io/posts/github-pages-guide.html">
-  <meta property="og:image" content="https://example.github.io/og-image.png">
+  <meta property="og:url" content="https://mengranjun.github.io/posts/github-pages-guide.html">
+  <meta property="og:image" content="https://mengranjun.github.io/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="../css/style.css">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="../favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
-  <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://example.github.io/feed.xml">
-  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+  <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://mengranjun.github.io/feed.xml">
+  <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t){var h=new Date().getHours();t=(h>=7&&h<19)?"light":"dark";}if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <div class="progress-bar"></div>
@@ -49,7 +49,7 @@
           <span>·</span>
           <span>约 3 分钟读完</span>
         </div>
-        <h1>零成本上线：用 GitHub Pages 托管个人博客</h1>
+        <h1 style="view-transition-name:post-5fb24acbc2">零成本上线：用 GitHub Pages 托管个人博客</h1>
         <span class="ai-notice" title="本文内容由 AI 生成，仅供参考">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg>
           <span>由AI生成</span>
@@ -93,13 +93,13 @@
 <h3 id="2-推送代码">2. 推送代码</h3>
 
 <div class="code-block">
-  <button class="copy-btn">复制</button>
-<pre><code class="language-bash">git init
-git add .
-git commit -m "Initial blog template"
-git branch -M main
-git remote add origin https://github.com/用户名/用户名.github.io.git
-git push -u origin main</code></pre>
+  <button class="copy-btn" type="button">复制</button>
+<pre><code class="language-bash"><span class="cl"><span class="cl-n" aria-hidden="true">1</span><span class="tk tk-k">git</span> init</span>
+<span class="cl"><span class="cl-n" aria-hidden="true">2</span><span class="tk tk-k">git</span> add .</span>
+<span class="cl"><span class="cl-n" aria-hidden="true">3</span><span class="tk tk-k">git</span> commit -m <span class="tk tk-s">"Initial blog template"</span></span>
+<span class="cl"><span class="cl-n" aria-hidden="true">4</span><span class="tk tk-k">git</span> branch -M main</span>
+<span class="cl"><span class="cl-n" aria-hidden="true">5</span><span class="tk tk-k">git</span> remote add origin https://github.com/用户名/用户名.github.io.<span class="tk tk-k">git</span></span>
+<span class="cl"><span class="cl-n" aria-hidden="true">6</span><span class="tk tk-k">git</span> push -u origin main</span></code></pre>
 </div>
 
 <h3 id="3-开启-pages">3. 开启 Pages</h3>

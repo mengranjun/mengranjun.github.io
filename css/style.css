@@ -1,5 +1,6 @@
 /* ============================================
    MineAI Blog — Paper & Ink Theme
+   Nah , Now is Muroj Blog. MineAI Blog Just a Early Name
    Pure static, zero-dependency stylesheet
    ============================================ */
 
@@ -613,15 +614,15 @@ main { flex: 1; }
 .about-content p { color: var(--text); margin-bottom: 1.2em; }
 
 /* ============================================================
-   关于页 · 姓名彩蛋
-   把鼠标放到「孟然君」上（或键盘 Tab 聚焦、手机上点一下），依次发生：
-     ① 上方拉出一个菜单，复选框亮起
-     ② 复选框画出对勾，选中 “Muroj”
-     ③ 中文名向上滚出，英文名 Muroj 从下方滚入顶替
-     ④ 下方描述跟着替换（方案 B）或新增（方案 A）
-   全部由 CSS 驱动，不依赖 JavaScript，禁用 JS 也照常工作。
-   外面那圈「小黑/白框 + 四角括号 + 呼吸点」是给读者的提示：
-   一眼就知道这里有东西可以点。
+   关于页 · 姓名彩蛋（支持任意多个名字）
+   桌面端：
+     ① 鼠标移到「孟然君」上 → 菜单展开、复选框亮起并画出对勾
+     ② 滚轮上/下 → 复选框在名字列表里上下滑动，显示的名字跟着切换
+     ③ 鼠标移开后菜单「保持展开」（按 Esc 或点别处才收起）
+   移动端：点一下名字就切换到下一个名字。
+   状态由 js/enhance.js 给 .alias 加 .is-open 来驱动；
+   没有 JS 时下面的 :hover / :focus 规则仍然能让菜单弹出来。
+   外面那圈「小黑/白框 + 四角括号 + 呼吸点」是给读者的提示。
    ============================================================ */
 
 .hello-line { position: relative; }
@@ -638,14 +639,15 @@ main { flex: 1; }
 }
 
 .alias:hover,
-.alias:focus {
+.alias:focus,
+.alias.is-open {
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
   background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
 .alias:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
 
-/* 四角括号：hover 时向外张开一点 */
+/* 四角括号：展开时向外张开一点 */
 .alias::before {
   content: "";
   position: absolute;
@@ -666,7 +668,8 @@ main { flex: 1; }
 }
 
 .alias:hover::before,
-.alias:focus::before { opacity: 1; inset: -7px; }
+.alias:focus::before,
+.alias.is-open::before { opacity: 1; inset: -7px; }
 
 /* 右上角的呼吸小圆点：提示“这里可以点” */
 .alias::after {
@@ -688,52 +691,61 @@ main { flex: 1; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
-/* 一旦玩过一次，呼吸点换成实心小勾（见下方 .is-chosen） */
+/* 展开过之后呼吸点停下、变成“已选中”的小勾（见 .is-chosen） */
+.alias.is-open::after,
 .about-grid.is-chosen .alias::after { animation: none; }
 
-/* ---- 名字舞台：中英文叠在同一格，宽度取较宽的那个，切换时不会左右抖 ----
-   line-height 必须继承 h2，否则整块会比周围文字高/低几个像素 */
+/* ---- 名字舞台：所有名字叠在同一格，靠 translateY 上下滚动切换 ----
+   line-height 必须继承 h2，否则整块会比周围文字高/低几个像素。
+   宽度由 js/enhance.js 按「当前名字」实测并显式设置，
+   下面的过渡让外框跟着名字平滑伸缩，而不是永远按最长名字撑开 */
 .alias-stage {
   display: inline-grid;
+  /* 关键：列宽必须允许收缩到 JS 设定的宽度。
+     否则轨道会被「最宽的隐藏名字」撑住（min-content 下限），
+     当前名字在过宽轨道里居中后错位，被 overflow 裁掉一半 */
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;       /* 中英文字体不同，按视觉中心对齐更齐整 */
   overflow: hidden;
   line-height: inherit;
   padding: 0 0.06em;
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.alias-cn,
-.alias-en {
+.alias-name {
   grid-area: 1 / 1;
+  min-width: 0;              /* 允许收缩，别把轨道撑回最宽名字的尺寸 */
+  white-space: nowrap;       /* 轨道暂时比名字窄时（宽度过渡中）也不许折行 */
   text-align: center;
-  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
-}
-
-/* 中英文都给品牌渐变，视觉统一 */
-.alias-cn,
-.alias-en {
   background: var(--brand-grad);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  opacity: 0;
+  transform: translateY(calc(var(--off, 1) * 105%));
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
 }
 
-.alias-en {
+/* 没有 JS 时的兜底：只显示第一个名字 */
+.alias-name:first-child { --off: 0; opacity: 1; }
+.alias-name.is-on { opacity: 1; }
+
+/* 纯拉丁字母的名字用无衬线粗体，和中文名分开处理 */
+.alias-name.is-latin {
   font-family: var(--font-sans);
   font-weight: 700;
   font-size: 0.96em;
   letter-spacing: 0.005em;
-  transform: translateY(105%);
-  opacity: 0;
 }
 
-/* ---- 弹出的菜单 ---- */
+/* ---- 弹出的菜单：一列名字 + 一个会滑动的复选框 ---- */
 .alias-menu {
+  --row-h: 26px;
+  --pad-y: 7px;
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 12px);
-  display: flex;
-  align-items: center;
-  padding: 8px 13px;
+  bottom: calc(100% + 14px);
+  padding: var(--pad-y) 6px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 11px;
@@ -743,8 +755,38 @@ main { flex: 1; }
   transform: translate(-50%, 8px) scale(0.92);
   transform-origin: 50% 130%;
   pointer-events: none;
-  z-index: 6;
+  z-index: 300;              /* 必须高于 .site-header 的 100，否则会被置顶导航挡住 */
   transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.alias:hover .alias-menu,
+.alias:focus .alias-menu,
+.alias.is-open .alias-menu {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  pointer-events: auto;
+}
+
+/* ---- 上方放不下时（名字贴着置顶导航），菜单翻到名字下面 ---- */
+.alias.is-flip .alias-menu {
+  top: calc(100% + 14px);
+  bottom: auto;
+  transform: translate(-50%, -8px) scale(0.92);
+  transform-origin: 50% -30%;
+}
+
+.alias.is-flip:hover .alias-menu,
+.alias.is-flip:focus .alias-menu,
+.alias.is-flip.is-open .alias-menu { transform: translate(-50%, 0) scale(1); }
+
+.alias.is-flip .alias-menu-arrow {
+  top: -5px;
+  bottom: auto;
+  border-right: none;
+  border-bottom: none;
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  border-radius: 2px 0 0 0;
 }
 
 .alias-menu-arrow {
@@ -761,18 +803,74 @@ main { flex: 1; }
   border-radius: 0 0 2px 0;
 }
 
-.alias-item { display: flex; align-items: center; gap: 7px; }
+.alias-list { display: flex; flex-direction: column; }
 
-.alias-item-text {
+/* ---- 名字旁边的操作提示：菜单展开时淡入 ---- */
+.alias-hint {
+  display: inline-block;
+  margin-left: 0.7em;
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px;
+  padding: 3px 12px;
+  white-space: nowrap;
+  vertical-align: middle;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.alias:hover ~ .alias-hint,
+.alias:focus ~ .alias-hint,
+.alias.is-open ~ .alias-hint {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: 0.45s;
+}
+
+@media (max-width: 720px) {
+  .alias-hint {
+    display: block;
+    margin: 10px 0 0;
+    white-space: normal;
+    width: fit-content;
+  }
+}
+.alias-opt {
+  display: flex;
+  align-items: center;
+  height: var(--row-h);
+  padding: 0 14px 0 34px;
+  border-radius: 7px;
   font-family: var(--font-sans);
   font-size: 0.86rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--text-strong);
+  color: var(--text-muted);
+  transition: color 0.2s ease, background-color 0.2s ease;
 }
 
-/* ---- 复选框：方框先亮起，再一笔画出对勾 ---- */
-.alias-check { width: 17px; height: 17px; flex-shrink: 0; }
+.alias-opt.is-on { color: var(--text-strong); background: var(--accent-soft); }
+
+/* 复选框本体：靠 translateY 在选项之间滑动 */
+.alias-check {
+  position: absolute;
+  left: 11px;
+  top: calc(var(--pad-y) + (var(--row-h) - 17px) / 2);
+  width: 17px;
+  height: 17px;
+  transform: translateY(calc(var(--sel, 0) * var(--row-h)));
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.alias-check svg { display: block; width: 17px; height: 17px; }
 
 .alias-check-box {
   fill: none;
@@ -794,34 +892,27 @@ main { flex: 1; }
 }
 
 /* ================= 展开状态 ================= */
-/* ① 菜单先出来 */
-.alias:hover .alias-menu,
-.alias:focus .alias-menu { opacity: 1; transform: translate(-50%, 0) scale(1); }
-
-/* ② 复选框亮起并画出对勾 */
 .alias:hover .alias-check-box,
-.alias:focus .alias-check-box { stroke: var(--accent); opacity: 1; }
+.alias:focus .alias-check-box,
+.alias.is-open .alias-check-box { stroke: var(--accent); opacity: 1; }
+
 .alias:hover .alias-check-tick,
-.alias:focus .alias-check-tick { stroke-dashoffset: 0; }
+.alias:focus .alias-check-tick,
+.alias.is-open .alias-check-tick { stroke-dashoffset: 0; }
 
-/* ③ 中文名上滚、英文名顶上来 */
-.alias:hover .alias-cn,
-.alias:focus .alias-cn { transform: translateY(-105%); opacity: 0; }
-.alias:hover .alias-en,
-.alias:focus .alias-en { transform: translateY(0); opacity: 1; }
-
-/* 出场顺序：菜单 0s → 勾选 0.14s → 名字 0.5s（移开鼠标不延迟，立刻还原） */
+/* 出场顺序：菜单 0s → 复选框 0.14s → 对勾 0.26s（名字切换由 JS 控制时机） */
 .alias:hover .alias-check-box,
-.alias:focus .alias-check-box { transition-delay: 0.14s; }
+.alias:focus .alias-check-box,
+.alias.is-open .alias-check-box { transition-delay: 0.14s; }
 .alias:hover .alias-check-tick,
-.alias:focus .alias-check-tick { transition-delay: 0.26s; }
-.alias:hover .alias-cn,
-.alias:focus .alias-cn,
-.alias:hover .alias-en,
-.alias:focus .alias-en { transition-delay: 0.5s; }
+.alias:focus .alias-check-tick,
+.alias.is-open .alias-check-tick { transition-delay: 0.26s; }
 
 /* ============================================================
-   描述 · 方案 B【当前启用】：悬浮时「替换」已有的一段描述
+   描述 · 方案 B【当前启用】：跟着「当前选中的名字」替换
+   选中第 1 个名字 → 显示 default；选中第 2 个及以后的 → 显示 alt。
+   .alias.is-alt 由 js/enhance.js 在切换名字时维护，
+   所以不会再出现「明明选着孟然君，描述却变成 Muroj 的」这种情况。
    两段文字叠在同一格、同一位置：只改 opacity 和一点点模糊，
    不做位移，所以两段话看起来落在完全相同的位置上。
    想停用：把 about.html 里整个 <div class="about-swap"> 注释掉。
@@ -836,22 +927,20 @@ main { flex: 1; }
 
 .about-swap-alt { opacity: 0; filter: blur(3px); pointer-events: none; }
 
-.about-content:has(.alias:hover) .about-swap-default,
-.about-content:has(.alias:focus) .about-swap-default {
+.about-content:has(.alias.is-alt) .about-swap-default {
   opacity: 0;
   filter: blur(3px);
-  transition-delay: 0.8s;
+  transition-delay: 0.3s;
 }
 
-.about-content:has(.alias:hover) .about-swap-alt,
-.about-content:has(.alias:focus) .about-swap-alt {
+.about-content:has(.alias.is-alt) .about-swap-alt {
   opacity: 1;
   filter: blur(0);
-  transition-delay: 0.8s;
+  transition-delay: 0.3s;
 }
 
 /* ============================================================
-   描述 · 方案 A【当前停用】：悬浮时「新增」一段描述
+   描述 · 方案 A【当前停用】：切换名字时「新增」一段描述
    启用后下方内容会被推开。启用方法见 about.html 里的注释。
    ============================================================ */
 .about-extra {
@@ -864,13 +953,12 @@ main { flex: 1; }
               transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), margin-bottom 0.5s ease;
 }
 
-.about-content:has(.alias:hover) .about-extra,
-.about-content:has(.alias:focus) .about-extra {
+.about-content:has(.alias.is-alt) .about-extra {
   max-height: 10em;
   opacity: 1;
   margin-bottom: 1.2em;
   transform: translateY(0);
-  transition-delay: 0.8s;
+  transition-delay: 0.3s;
 }
 
 /* 减少动效偏好：不位移、不延迟，只做淡入淡出 */
@@ -878,19 +966,14 @@ main { flex: 1; }
   .alias-menu,
   .alias-check-box,
   .alias-check-tick,
-  .alias-cn,
-  .alias-en,
+  .alias-name,
   .about-swap > p,
   .about-extra { transition-delay: 0s !important; }
-  .alias-en,
-  .alias:hover .alias-cn,
-  .alias:focus .alias-cn,
+  .alias-name { transform: none; }
   .about-swap-alt,
   .about-extra { transform: none; }
-  .about-content:has(.alias:hover) .about-swap-default,
-  .about-content:has(.alias:focus) .about-swap-default { transform: none; }
-  .about-content:has(.alias:hover) .about-extra,
-  .about-content:has(.alias:focus) .about-extra { transform: none; }
+  .about-content:has(.alias.is-alt) .about-swap-default { transform: none; }
+  .about-content:has(.alias.is-alt) .about-extra { transform: none; }
 }
 
 .skill-chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 24px; }
@@ -1305,6 +1388,209 @@ main { flex: 1; }
   .hero::after { transition: none; }
   .about-swap > p { transition: none; filter: none; }
   .about-swap-alt { filter: none; }
-  .about-content:has(.alias:hover) .about-swap-default,
-  .about-content:has(.alias:focus) .about-swap-default { filter: none; }
+  .about-content:has(.alias.is-alt) .about-swap-default { filter: none; }
+  .alias-hint { transition: none; }
+}
+
+/* ==========================================================================
+   9. 代码块：行号 + 语法高亮
+   ========================================================================== */
+.code-block code .cl-n {
+  display: inline-block;
+  width: 2ch;
+  margin-right: 1.1em;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.26);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.tk-c { color: #6d8d99; font-style: italic; }   /* 注释 */
+.tk-s { color: #7fd6a8; }                        /* 字符串 */
+.tk-k { color: #57b6f0; }                        /* 关键字 */
+.tk-n { color: #e8b96f; }                        /* 数字 */
+.tk-p { color: #b6a6f0; }                        /* CSS 自定义属性 */
+.tk-t { color: #57b6f0; }                        /* HTML 标签 */
+
+/* ==========================================================================
+   10. 标签页
+   ========================================================================== */
+.tag { display: inline-block; transition: background-color 0.2s ease, color 0.2s ease; }
+a.tag:hover { opacity: 1; color: #fff; background: var(--accent); }
+
+.chip.is-current {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.tag-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.tag-card {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-strong);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.tag-card:hover {
+  opacity: 1;
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: var(--shadow);
+  color: var(--accent);
+}
+
+.tag-card-name { font-weight: 600; font-size: 1rem; }
+
+.tag-card-count {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   11. 归档页写作热力图
+   ========================================================================== */
+.heatmap {
+  margin-bottom: 30px;
+  padding: 16px 18px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.heatmap-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.heatmap-sum { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0; }
+
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: 3.2em repeat(12, minmax(0, 1fr)) 3em;
+  gap: 5px;
+  align-items: center;
+}
+
+.hm-m,
+.hm-year,
+.hm-total {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.hm-year { text-align: right; padding-right: 6px; }
+.hm-total { text-align: right; }
+.hm-m { text-align: center; opacity: 0.65; }
+
+.hm-cell {
+  display: block;
+  aspect-ratio: 1 / 1;
+  min-height: 16px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--border) 65%, transparent);
+  transition: transform 0.18s ease;
+}
+
+.hm-cell[data-lv="1"] { background: color-mix(in srgb, var(--grad-1) 30%, transparent); }
+.hm-cell[data-lv="2"] { background: color-mix(in srgb, var(--grad-2) 52%, transparent); }
+.hm-cell[data-lv="3"] { background: color-mix(in srgb, var(--grad-3) 72%, transparent); }
+.hm-cell[data-lv="4"] { background: var(--grad-3); }
+
+.hm-cell:hover { transform: scale(1.18); }
+
+/* ==========================================================================
+   12. 跨页面转场（卡片 → 文章页）
+   浏览器支持 Cross-Document View Transitions 时自动生效，不支持就普通跳转。
+   ========================================================================== */
+@view-transition { navigation: auto; }
+
+.site-header { view-transition-name: site-header; }
+.site-footer { view-transition-name: site-footer; }
+
+::view-transition-group(site-header),
+::view-transition-group(site-footer) { animation: none; }
+
+/* ==========================================================================
+   13. 继续阅读提示
+   ========================================================================== */
+.resume {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  font-size: 0.86rem;
+  color: var(--text);
+  opacity: 0;
+  transform: translate(-50%, 16px);
+  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.resume.show { opacity: 1; transform: translate(-50%, 0); }
+
+.resume-text b { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.resume-btn {
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--brand-grad);
+  color: #fff;
+  white-space: nowrap;
+}
+
+.resume-close {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.resume-close:hover { color: var(--text-strong); background: var(--accent-soft); }
+
+@media (max-width: 520px) {
+  .resume { left: 12px; right: 12px; bottom: 14px; transform: translateY(16px); border-radius: 14px; }
+  .resume.show { transform: translateY(0); }
+  .resume-text { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resume { transition: none; }
+  .hm-cell { transition: none; }
+  .tag-card { transition: none; }
 }

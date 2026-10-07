@@ -16,6 +16,7 @@ MurojBlog 构建脚本（零第三方依赖，只用 Python 标准库）
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import html
 import json
 import math
@@ -57,13 +58,27 @@ SITE = {
     "description": "MurojBlog —— 孟然君的个人博客。写技术，也写想法和日常；内容用 Markdown 书写，站点托管在 GitHub Pages 上。",
     "author": "孟然君",
     "lang": "zh-CN",
-    "url": "https://example.github.io",   # ←← 用 python build.py url <地址> 自动修改
+    "url": "https://mengranjun.github.io",   # ←← 用 python build.py url <地址> 自动修改
     "latest": 3,                          # 首页「最新文章」显示几篇
 }
 
 # 阅读速度：中文每分钟多少字（改这两个数字即可调整「约 N 分钟读完」）
 READ_CJK_PER_MIN = 300
 READ_WORD_PER_MIN = 180
+
+# 自动深浅色的「白天」时段（生成页 <head> 里的内联脚本由这两处生成）。
+# 注意：index / archive / about / 404 四个静态页里手写着同一段脚本，
+# 改这两个数字后要同步那几处（搜索 "h>=" 就能找到）。
+THEME_DAY_START = 7
+THEME_DAY_END = 19
+
+THEME_SCRIPT = (
+    '<script>document.documentElement.className+=" js";'
+    'try{var t=localStorage.getItem("blog-theme");'
+    'if(!t){var h=new Date().getHours();t=(h>=%d&&h<%d)?"light":"dark";}'
+    'if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>'
+    % (THEME_DAY_START, THEME_DAY_END)
+)
 
 BUILD_START = "<!-- BUILD:{0}:START -->"
 BUILD_END = "<!-- BUILD:{0}:END -->"
@@ -115,8 +130,19 @@ def inline(text: str) -> str:
     text = re.sub(r"`([^`]+)`", stash_code, text)
     text = _escape_keep_tags(text)
 
-    text = re.sub(r"!\[([^\]]*)\]\(([^)\s]+)\)", r'<img src="\2" alt="\1" loading="lazy">', text)
-    text = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", r'<a href="\2">\1</a>', text)
+    # 注意：到这里正文已经过 html.escape(quote=False)，所以只需要处理 `"`，
+    # 不能再整体 escape 一次（会把 &amp; 变成 &amp;amp;）。
+    def _img(m):
+        alt = m.group(1).replace('"', '&quot;')      # 防止 alt 里的引号撑破属性
+        src = m.group(2).replace('"', '%22')
+        return '<img src="%s" alt="%s" loading="lazy">' % (src, alt)
+
+    def _link(m):
+        href = m.group(2).replace('"', '%22')        # 防止 href 里的引号撑破属性
+        return '<a href="%s">%s</a>' % (href, m.group(1))
+
+    text = re.sub(r"!\[([^\]]*)\]\(([^)\s]+)\)", _img, text)
+    text = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", _link, text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"~~([^~]+)~~", r"<del>\1</del>", text)
     text = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<em>\1</em>", text)
@@ -208,6 +234,16 @@ def _render_list(lines: list[str], i: int) -> tuple[str, int]:
                 stack[-1][3] = True          # 父级 <li> 内嵌入了子列表
             parts.append("%s<%s>" % ("  " * len(stack), tag))
             stack.append([indent, tag, False, False])
+        elif tag != stack[-1][1]:
+            # 同一缩进层级从 ul 换成 ol（或反过来）：先闭合旧列表再开新列表，
+            # 否则有序项会被塞进 <ul> 里
+            lvl = stack.pop()
+            close_li(lvl, len(stack))
+            parts.append("%s</%s>" % ("  " * len(stack), lvl[1]))
+            if stack:
+                stack[-1][3] = True
+            parts.append("%s<%s>" % ("  " * len(stack), tag))
+            stack.append([indent, tag, False, False])
         else:
             close_li(stack[-1], len(stack))
 
@@ -254,14 +290,7 @@ def md_to_html(src: str, headings: list | None = None) -> str:
                 buf.append(lines[i])
                 i += 1
             i += 1
-            code = html.escape("\n".join(buf), quote=False)
-            cls = ' class="language-%s"' % lang if lang else ""
-            out.append(
-                '<div class="code-block">\n'
-                '  <button class="copy-btn">复制</button>\n'
-                "<pre><code%s>%s</code></pre>\n"
-                "</div>" % (cls, code)
-            )
+            out.append(render_code_block("\n".join(buf), lang))
             continue
 
         # ---- 分隔线 ----
@@ -276,7 +305,9 @@ def md_to_html(src: str, headings: list | None = None) -> str:
             lvl = len(m.group(1))
             lvl = 2 if lvl <= 2 else lvl
             raw = m.group(2)
-            plain = re.sub(r"[*`~\[\]]|\(([^)]*)\)", lambda mm: mm.group(1) or "", raw)
+            # [文字](链接) 只留「文字」，URL 不能混进目录文字和锚点 id
+            plain = re.sub(r"\([^)]*\)", "", raw)
+            plain = re.sub(r"[*`~\[\]]", "", plain).strip()
             attr = ""
             if headings is not None and lvl in (2, 3):
                 hid = _heading_id(plain) or "section"
@@ -341,6 +372,96 @@ def md_to_html(src: str, headings: list | None = None) -> str:
 
 
 # ==========================================================================
+# 1b. 极简语法高亮（零依赖，逐行处理，够用就好）
+# ==========================================================================
+
+_HL_SHELL = ("if then else elif fi for while do done case esac in function return export source "
+             "echo cd ls mkdir rm cp mv cat touch chmod sudo git npm pnpm python pip curl wget "
+             "grep sed awk find set local")
+_HL_JS = ("var let const function return if else for while do switch case break continue new this "
+          "typeof instanceof in of class extends try catch finally throw async await yield delete "
+          "void null undefined true false import export from default")
+_HL_PY = ("def class return if elif else for while in not and or is None True False import from as "
+          "with try except finally raise lambda yield global nonlocal pass break continue assert "
+          "del async await")
+
+HL_KEYWORDS = {
+    "bash": _HL_SHELL, "sh": _HL_SHELL, "shell": _HL_SHELL, "zsh": _HL_SHELL,
+    "js": _HL_JS, "javascript": _HL_JS, "json": "true false null",
+    "python": _HL_PY, "py": _HL_PY,
+    "css": "", "html": "", "xml": "", "yaml": "true false null", "yml": "true false null",
+}
+
+HL_COMMENT = {
+    "python": r"#[^\n]*", "py": r"#[^\n]*",
+    "bash": r"#[^\n]*", "sh": r"#[^\n]*", "shell": r"#[^\n]*", "zsh": r"#[^\n]*",
+    "yaml": r"#[^\n]*", "yml": r"#[^\n]*",
+    "js": r"//[^\n]*|/\*.*?\*/", "javascript": r"//[^\n]*|/\*.*?\*/",
+    "css": r"/\*.*?\*/",
+}
+
+
+def _hl_line(line: str, lang: str) -> str:
+    """把一行代码变成带高亮 span 的 HTML（入参是原始代码，内部负责转义）。"""
+    # 注意：每个规则要用不同的组名，否则 re 会因为重名直接报错
+    rules = []                                  # (组名, 样式名, 正则)
+    cpat = HL_COMMENT.get(lang)
+    if cpat:
+        rules.append(("c", "c", cpat))
+    if lang in ("html", "xml"):
+        rules.append(("t", "t", r"</?[a-zA-Z][^>]*>"))
+    rules.append(("s1", "s", r'"(?:\\.|[^"\\])*"'))
+    rules.append(("s2", "s", r"'(?:\\.|[^'\\])*'"))
+    rules.append(("s3", "s", r"`(?:\\.|[^`\\])*`"))
+    kws = HL_KEYWORDS.get(lang, "")
+    if kws:
+        rules.append(("k", "k",
+                      r"\b(?:%s)\b" % "|".join(sorted(kws.split(), key=len, reverse=True))))
+    rules.append(("n", "n", r"\b\d+(?:\.\d+)?(?:px|em|rem|%|s|ms|dvh|vh|vw)?\b"))
+    if lang == "css":
+        rules.append(("p", "p", r"--?[a-zA-Z][\w-]*(?=\s*:)"))
+
+    if not rules:
+        return html.escape(line, quote=False)
+
+    try:
+        pat = re.compile("|".join("(?P<%s>%s)" % (g, p) for g, _, p in rules))
+    except re.error:
+        return html.escape(line, quote=False)
+
+    cls_of = {g: c for g, c, _ in rules}
+    out, pos = [], 0
+    for m in pat.finditer(line):
+        if m.start() > pos:
+            out.append(html.escape(line[pos:m.start()], quote=False))
+        out.append('<span class="tk tk-%s">%s</span>'
+                   % (cls_of[m.lastgroup], html.escape(m.group(0), quote=False)))
+        pos = m.end()
+    if pos < len(line):
+        out.append(html.escape(line[pos:], quote=False))
+    return "".join(out)
+
+
+def render_code_block(raw: str, lang: str) -> str:
+    """代码块：语法高亮 + 行号 + 复制按钮。
+    行号放在 .cl-n 里，复制时由 main.js 从克隆节点里剥掉，不会混进剪贴板。"""
+    lang = (lang or "").lower()
+    lines = raw.split("\n")
+    while lines and not lines[-1].strip():
+        lines.pop()
+    body = "\n".join(
+        '<span class="cl"><span class="cl-n" aria-hidden="true">%d</span>%s</span>'
+        % (i + 1, _hl_line(ln, lang))
+        for i, ln in enumerate(lines)
+    )
+    cls = ' class="language-%s"' % lang if lang else ""
+    return ('<div class="code-block">\n'
+            '  <button class="copy-btn" type="button">复制</button>\n'
+            "<pre><code%s>%s</code></pre>\n"
+            "</div>" % (cls, body))
+
+
+# ==========================================================================
 # 2. Front matter + 文章读取
 # ==========================================================================
 
@@ -386,17 +507,22 @@ def slugify(name: str) -> str:
 def load_posts() -> list[dict]:
     posts = []
     for f in sorted(POSTS_DIR.glob("*.md")):
-        meta, body = parse_front_matter(f.read_text(encoding="utf-8"))
+        # utf-8-sig：Windows 编辑器常给文件加 BOM，不去掉的话 front matter 会整段失效
+        meta, body = parse_front_matter(f.read_text(encoding="utf-8-sig"))
         title = meta.get("title") or f.stem
         date = meta.get("date") or dt.date.fromtimestamp(f.stat().st_mtime).isoformat()
+        sort_date = _parse_date(date)
+        if meta.get("date") and sort_date == dt.date(1970, 1, 1):
+            print("  ! %s 的日期 %r 无法识别，已按最旧日期排到最后" % (f.name, date))
         tags = [t.strip() for t in re.split(r"[,，]", meta.get("tags", "")) if t.strip()]
         posts.append({
             "slug": meta.get("slug") or f.stem,
             "file": f,
             "title": title,
             "date": date,
-            "sort": _parse_date(date),
+            "sort": sort_date,
             "tags": tags,
+            "pin": str(meta.get("pin", "")).strip().lower() in ("true", "yes", "1", "on", "是"),
             "summary": meta.get("summary", ""),
             "ai": str(meta.get("ai", "true")).strip().lower() not in ("false", "no", "0", "否"),
             "minutes": int(meta["minutes"]) if meta.get("minutes", "").isdigit()
@@ -404,9 +530,24 @@ def load_posts() -> list[dict]:
             "words": word_count(body),
             "body_md": body,
         })
-    # 首页置顶
-    posts.sort(key=lambda p: (str(p.get("pin", "")), p["sort"]), reverse=True)
-    posts.sort(key=lambda p: p["sort"], reverse=True)
+
+    # 归并 slug 相同的标签（比如同时写了 "AI" 和 "ai"），
+    # 否则两个标签会生成同一个 tags/xxx.html 互相覆盖
+    canon: dict[str, str] = {}
+    for p in posts:
+        merged = []
+        for t in p["tags"]:
+            s = tag_slug(t)
+            if s in canon:
+                t = canon[s]
+            else:
+                canon[s] = t
+            if t not in merged:
+                merged.append(t)
+        p["tags"] = merged
+
+    # 置顶优先，其次按日期倒序（一次排序搞定）
+    posts.sort(key=lambda p: (p["pin"], p["sort"]), reverse=True)
     return posts
 
 
@@ -484,14 +625,12 @@ def head_block(title: str, description: str, prefix: str, url_path: str,
         '  <link rel="alternate icon" href="%sfavicon.ico" sizes="any">\n'
         '  <link rel="apple-touch-icon" href="%sapple-touch-icon.png">\n'
         '  <link rel="alternate" type="application/rss+xml" title="%s" href="%s/feed.xml">\n'
-        '  <script>document.documentElement.className+=" js";'
-        'try{var t=localStorage.getItem("blog-theme");'
-        'if(!t&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)t="dark";'
-        'if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>'
+        '  %s'
         % (
             html.escape(title), desc, full, og_type, SITE["name"],
             ogt, desc, full, SITE["url"].rstrip("/"),
             prefix, prefix, prefix, prefix, SITE["name"], SITE["url"].rstrip("/"),
+            THEME_SCRIPT,
         )
     )
 
@@ -551,17 +690,24 @@ def footer_block(prefix: str) -> str:
     )
 
 
+def vt_name(slug: str) -> str:
+    """给卡片和文章标题取一个配对用的 view-transition-name（纯 ASCII，稳定）。"""
+    return "post-" + hashlib.md5(slug.encode("utf-8")).hexdigest()[:10]
+
+
 def render_card(p: dict, prefix: str = "") -> str:
     badge = ("\n            " + AI_BADGE.replace("\n", "\n            ")) if p["ai"] else ""
+    pin = '<span class="tag">置顶</span>' if p.get("pin") else ""
     return (
-        '<article class="post-card reveal">\n'
-        '            <div class="card-top"><span class="tag">%s</span><span>%s</span></div>\n'
+        '<article class="post-card reveal" style="view-transition-name:%s">\n'
+        '            <div class="card-top">%s<span class="tag">%s</span><span>%s</span></div>\n'
         '            <h3><a href="%sposts/%s.html">%s</a></h3>%s\n'
         '            <p>%s</p>\n'
         '            <div class="card-foot"><span>约 %d 分钟读完</span>'
         '<a class="read-more" href="%sposts/%s.html">阅读全文 →</a></div>\n'
         "          </article>"
         % (
+            vt_name(p["slug"]), pin,
             html.escape(p["tags"][0] if p["tags"] else "随笔"),
             p["date"], prefix, p["slug"], html.escape(p["title"]), badge,
             html.escape(p["summary"]), p["minutes"], prefix, p["slug"],
@@ -569,19 +715,23 @@ def render_card(p: dict, prefix: str = "") -> str:
     )
 
 
-def render_archive_item(p: dict) -> str:
-    tags = "".join('<span class="tag">%s</span>' % html.escape(t) for t in p["tags"])
+def render_archive_item(p: dict, prefix: str = "") -> str:
+    tags = '<span class="tag">置顶</span>' if p.get("pin") else ""
+    tags += "".join(
+        '<a class="tag" href="%stags/%s.html">%s</a>'
+        % (prefix, tag_slug(t), html.escape(t)) for t in p["tags"]
+    )
     badge = ("\n            " + AI_BADGE.replace("\n", "\n            ")) if p["ai"] else ""
     return (
         '<li data-tags="%s">\n'
         '          <span class="date">%s</span>\n'
         "          <div>\n"
-        '            <h3><a href="posts/%s.html">%s</a></h3>%s\n'
+        '            <h3><a href="%sposts/%s.html">%s</a></h3>%s\n'
         "            <p>%s</p>\n"
         '            <div class="meta-tags">%s</div>\n'
         "          </div>\n"
         "        </li>"
-        % (html.escape(",".join(p["tags"])), p["date"], p["slug"],
+        % (html.escape(",".join(p["tags"])), p["date"], prefix, p["slug"],
            html.escape(p["title"]), badge, html.escape(p["summary"]), tags)
     )
 
@@ -610,7 +760,7 @@ def render_post(p: dict, newer: dict | None, older: dict | None) -> str:
         '    <article class="article-wrap">\n'
         '      <header class="article-header">\n'
         '        <div class="meta">\n%s\n        </div>\n'
-        "        <h1>%s</h1>%s\n"
+        '        <h1 style="view-transition-name:%s">%s</h1>%s\n'
         "      </header>\n\n"
         "      %s"
         '      <div class="article-body">\n%s\n      </div>\n\n'
@@ -629,6 +779,7 @@ def render_post(p: dict, newer: dict | None, older: dict | None) -> str:
                        og_title=p["title"]),
             header_block("../", ""),
             meta,
+            vt_name(p["slug"]),
             html.escape(p["title"]),
             badge,
             toc,
@@ -683,17 +834,189 @@ def build_search_index(posts: list[dict]) -> None:
     (ROOT / "js" / "search-index.js").write_text(js, encoding="utf-8", newline="\n")
 
 
+def tag_slug(tag: str) -> str:
+    return _heading_id(tag) or "tag"
+
+
+def collect_tags(posts: list[dict]) -> list[str]:
+    tags: list[str] = []
+    for p in posts:
+        for t in p["tags"]:
+            if t not in tags:
+                tags.append(t)
+    return tags
+
+
+def render_tag_page(tag: str, tagged: list, all_tags: list) -> str:
+    items = "\n".join(render_archive_item(p, "../") for p in tagged)
+    chips = "".join(
+        '<a class="chip%s" href="%s.html">%s</a>'
+        % (" is-current" if t == tag else "", tag_slug(t), html.escape(t))
+        for t in all_tags
+    )
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="%s">\n'
+        "<head>\n  %s\n</head>\n"
+        "<body>\n"
+        "  %s\n\n"
+        "  <main>\n"
+        '    <div class="article-wrap" style="max-width: 820px;">\n'
+        '      <div class="article-header">\n'
+        "        <h1>标签：%s</h1>\n"
+        '        <div class="meta"><span>共 %d 篇 · 按时间倒序</span></div>\n'
+        "      </div>\n\n"
+        '      <div class="skill-chips">%s</div>\n\n'
+        '      <ul class="post-list">\n%s\n      </ul>\n\n'
+        '      <nav class="article-nav">\n'
+        '        <a href="index.html">← 全部标签</a>\n'
+        '        <a href="../archive.html">返回归档 →</a>\n'
+        "      </nav>\n"
+        "    </div>\n"
+        "  </main>\n\n"
+        "  %s\n\n"
+        '  <script src="../js/main.js"></script>\n'
+        '  <script src="../js/enhance.js"></script>\n'
+        "</body>\n"
+        "</html>\n"
+        % (SITE["lang"],
+           head_block("标签：%s — %s" % (tag, SITE["name"]),
+                      "标签「%s」下的全部文章。" % tag,
+                      "../", "tags/%s.html" % tag_slug(tag)),
+           header_block("../", "archive"),
+           html.escape(tag), len(tagged), chips, items,
+           footer_block("../"))
+    )
+
+
+def render_tags_index(tags: list, posts: list) -> str:
+    counts = {}
+    for p in posts:
+        for t in p["tags"]:
+            counts[t] = counts.get(t, 0) + 1
+    cards = "\n".join(
+        '        <a class="tag-card" href="%s.html">'
+        '<span class="tag-card-name">%s</span>'
+        '<span class="tag-card-count">%d 篇</span></a>'
+        % (tag_slug(t), html.escape(t), counts.get(t, 0))
+        for t in tags
+    )
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="%s">\n'
+        "<head>\n  %s\n</head>\n"
+        "<body>\n"
+        "  %s\n\n"
+        "  <main>\n"
+        '    <div class="article-wrap" style="max-width: 820px;">\n'
+        '      <div class="article-header">\n'
+        "        <h1>全部标签</h1>\n"
+        '        <div class="meta"><span>%d 个标签 · %d 篇文章</span></div>\n'
+        "      </div>\n\n"
+        '      <div class="tag-cards">\n%s\n      </div>\n\n'
+        '      <nav class="article-nav">\n'
+        '        <a href="../index.html">← 回到首页</a>\n'
+        '        <a href="../archive.html">文章归档 →</a>\n'
+        "      </nav>\n"
+        "    </div>\n"
+        "  </main>\n\n"
+        "  %s\n\n"
+        '  <script src="../js/main.js"></script>\n'
+        '  <script src="../js/enhance.js"></script>\n'
+        "</body>\n"
+        "</html>\n"
+        % (SITE["lang"],
+           head_block("全部标签 — %s" % SITE["name"], "按标签浏览 MurojBlog 的全部文章。",
+                      "../", "tags/index.html"),
+           header_block("../", "archive"),
+           len(tags), len(posts), cards, footer_block("../"))
+    )
+
+
+def build_tag_pages(posts: list[dict]) -> list[str]:
+    tags = collect_tags(posts)
+    if not tags:
+        return []
+    out_dir = ROOT / "tags"
+    out_dir.mkdir(exist_ok=True)
+    for t in tags:
+        tagged = [p for p in posts if t in p["tags"]]
+        (out_dir / ("%s.html" % tag_slug(t))).write_text(
+            render_tag_page(t, tagged, tags), encoding="utf-8", newline="\n")
+    (out_dir / "index.html").write_text(
+        render_tags_index(tags, posts), encoding="utf-8", newline="\n")
+    # 标签改名/删除后，旧标签页同样要清掉
+    keep = {"%s.html" % tag_slug(t) for t in tags} | {"index.html"}
+    for old in out_dir.glob("*.html"):
+        if old.name not in keep:
+            old.unlink()
+            print("  清理过期标签页：tags/%s" % old.name)
+    return tags
+
+
+def build_heatmap(posts: list[dict]) -> str:
+    """按「年 × 月」统计发文量，做成一张热力图，注入归档页。"""
+    if not posts:
+        return ""
+    counts: dict = {}
+    for p in posts:
+        d = p["sort"]
+        counts[(d.year, d.month)] = counts.get((d.year, d.month), 0) + 1
+    years = sorted({y for y, _ in counts}, reverse=True)
+    top = max(counts.values())
+
+    def level(n: int) -> int:
+        if n <= 0:
+            return 0
+        if top <= 1:
+            return 3
+        return min(4, 1 + int((n - 1) / max(1, top - 1) * 3 + 0.5))
+
+    rows = []
+    for y in years:
+        cells = []
+        for m in range(1, 13):
+            n = counts.get((y, m), 0)
+            cells.append(
+                '<span class="hm-cell" data-lv="%d" title="%d 年 %d 月 · %d 篇"></span>'
+                % (level(n), y, m, n))
+        total = sum(counts.get((y, m), 0) for m in range(1, 13))
+        rows.append('        <span class="hm-year">%d</span>\n        %s\n'
+                    '        <span class="hm-total">%d</span>'
+                    % (y, "\n        ".join(cells), total))
+
+    months = "".join('<span class="hm-m">%d</span>' % m for m in range(1, 13))
+    return (
+        '<div class="heatmap">\n'
+        '          <div class="heatmap-head">\n'
+        "            <span>写作热力图</span>\n"
+        '            <span class="heatmap-sum">%d 篇 · %d 个月有更新</span>\n'
+        "          </div>\n"
+        '          <div class="heatmap-grid">\n'
+        '            <span class="hm-year"></span>\n'
+        "            %s\n"
+        '            <span class="hm-total"></span>\n'
+        "%s\n"
+        "          </div>\n"
+        "        </div>"
+        % (len(posts), len(counts), months, "\n".join(rows))
+    )
+
+
 def build_sitemap(posts: list[dict]) -> None:
     base = SITE["url"].rstrip("/")
     urls = [("", "1.0"), ("archive.html", "0.6"), ("about.html", "0.5")]
     urls += [("posts/%s.html" % p["slug"], "0.8") for p in posts]
+    urls += [("tags/index.html", "0.5")]
+    urls += [("tags/%s.html" % tag_slug(t), "0.4") for t in collect_tags(posts)]
     items = []
     for path, pri in urls:
         loc = "%s/%s" % (base, path) if path else base + "/"
         lastmod = ""
         if path.startswith("posts/"):
             match = next((p for p in posts if "posts/%s.html" % p["slug"] == path), None)
-            lastmod = "\n    <lastmod>%s</lastmod>" % match["date"] if match else ""
+            # 用解析后的日期而不是 front matter 原文，保证输出一定是 YYYY-MM-DD
+            lastmod = "\n    <lastmod>%s</lastmod>" % match["sort"].isoformat() if match else ""
         items.append("  <url>\n    <loc>%s</loc>%s\n    <priority>%s</priority>\n  </url>"
                      % (loc, lastmod, pri))
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -759,6 +1082,13 @@ def cmd_build() -> int:
         out.write_text(render_post(p, newer, older), encoding="utf-8", newline="\n")
     print("生成 %d 个文章页" % len(posts))
 
+    # 清理「幽灵页面」：.md 删除/改名后，旧 HTML 不能留在站里继续被发布
+    live = {"%s.html" % p["slug"] for p in posts}
+    for old in POSTS_DIR.glob("*.html"):
+        if old.name not in live:
+            old.unlink()
+            print("  清理过期文章页：posts/%s" % old.name)
+
     # 首页卡片
     latest = posts[: SITE["latest"]]
     inject(ROOT / "index.html", "POSTS",
@@ -767,17 +1097,17 @@ def cmd_build() -> int:
     # 归档
     inject(ROOT / "archive.html", "ARCHIVE",
            "\n".join(render_archive_item(p) for p in posts), "        ")
-    tags: list[str] = []
-    for p in posts:
-        for t in p["tags"]:
-            if t not in tags:
-                tags.append(t)
+    tags = collect_tags(posts)
     filters = ['<button class="filter-btn active" data-tag="all" aria-pressed="true">全部</button>']
     filters += ['<button class="filter-btn" data-tag="%s" aria-pressed="false">%s</button>'
                 % (html.escape(t), html.escape(t)) for t in tags]
     inject(ROOT / "archive.html", "FILTERS", "\n".join(filters), "        ")
     inject(ROOT / "archive.html", "COUNT",
            "<span>共 %d 篇 · 按时间倒序</span>" % len(posts), "          ")
+    inject(ROOT / "archive.html", "HEATMAP", build_heatmap(posts), "        ")
+
+    build_tag_pages(posts)
+    print("生成 %d 个标签页 + 标签总览页" % len(tags))
 
     build_sitemap(posts)
     build_feed(posts)
@@ -864,7 +1194,7 @@ def cmd_url(new_url: str) -> int:
         SITE["url"] = new_url
 
     # 2) 替换静态页面里写死的 canonical / og:url / og:image / feed.xml 地址
-    targets = ["index.html", "archive.html", "about.html", "404.html", "README.md"]
+    targets = ["index.html", "archive.html", "about.html", "404.html", "README.md", "README2.md"]
     changed = 0
     for name in targets:
         f = ROOT / name

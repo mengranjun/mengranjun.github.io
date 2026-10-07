@@ -4,3 +4,6 @@
 .workbuddy/
 __pycache__/
 *.pyc
+
+# 待评估的预览页（满意后合并进正式文件再删掉）
+preview-*.html
