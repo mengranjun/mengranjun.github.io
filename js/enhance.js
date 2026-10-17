@@ -99,18 +99,21 @@
     h1.setAttribute("aria-label", h1.textContent);
     var n = 0;
     paint(0);
-    (function tick() {
-      n++;
-      paint(n);
-      if (n < total) {
-        window.setTimeout(tick, 52 + (Math.random() * 34));
-      } else {
-        window.setTimeout(function () {
-          var c = $(".tw-caret", h1);
-          if (c) c.remove();
-        }, 900);
-      }
-    })();
+    // 等首屏淡入动画铺开一点再开始敲，不然字还没显出来就被清掉了
+    window.setTimeout(function () {
+      (function tick() {
+        n++;
+        paint(n);
+        if (n < total) {
+          window.setTimeout(tick, 52 + (Math.random() * 34));
+        } else {
+          window.setTimeout(function () {
+            var c = $(".tw-caret", h1);
+            if (c) c.remove();
+          }, 900);
+        }
+      })();
+    }, reduced ? 0 : 300);
   })();
 
 
@@ -282,6 +285,17 @@
       if (/^[\x20-\x7E]+$/.test(el.textContent.trim())) el.classList.add("is-latin");
     });
 
+    /* 给每个选项加上序号（1、2、3…），配合下面的数字键快捷跳转。
+       序号是 JS 生成的，所以你加名字时不用手写。 */
+    opts.forEach(function (o, i) {
+      if (o.querySelector(".alias-num")) return;
+      var num = doc.createElement("span");
+      num.className = "alias-num";
+      num.setAttribute("aria-hidden", "true");
+      num.textContent = String(i + 1);
+      o.insertBefore(num, o.firstChild);
+    });
+
     /* 名字贴着置顶导航时，菜单往上弹会被挡住 —— 量一下上方还剩多少空间，
        不够就翻到名字下面去。 */
     function placeMenu() {
@@ -422,6 +436,27 @@
       if (!open) return;
       if (e.target === alias || alias.contains(e.target)) return;
       setOpen(false);
+    });
+
+    /* ---- 按数字键直接跳到第 n 个名字 ---- */
+    function typingInField(t) {
+      if (!t) return false;
+      var tag = t.tagName ? t.tagName.toLowerCase() : "";
+      return tag === "input" || tag === "textarea" || tag === "select" || !!t.isContentEditable;
+    }
+
+    doc.addEventListener("keydown", function (e) {
+      if (!open) return;                                  // 菜单没展开时不抢数字键
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (typingInField(e.target)) return;
+      if (doc.querySelector(".cmdk")) return;             // 命令面板开着时让位
+      if (!/^[1-9]$/.test(e.key)) return;
+      var want = parseInt(e.key, 10) - 1;
+      if (want >= n || want === cur) return;
+      e.preventDefault();
+      setOpen(true);
+      markChosen();
+      select(want);
     });
   })();
 
