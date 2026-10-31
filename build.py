@@ -86,6 +86,13 @@ BUILD_END = "<!-- BUILD:{0}:END -->"
 CJK_RE = re.compile(r"[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]")
 CJK_PUNCT = "，。！？；：、）》」』】…—·"
 
+# 单独成段的原生 HTML（放视频、iframe 之类）：整段原样输出，不套 <p>、不转义。
+# 用法见 posts/video.md：一行 <video ...></video> 就是整篇文章。
+RAW_HTML_RE = re.compile(
+    r"^</?(?:video|audio|figure|figcaption|iframe|div|details|summary|section|picture|canvas|svg)\b",
+    re.I,
+)
+
 
 # ==========================================================================
 # 1. Markdown → HTML
@@ -182,6 +189,8 @@ def _is_block_start(lines: list[str], i: int) -> bool:
     if s.startswith(">"):
         return True
     if re.match(r"^\s*([-*+]|\d+[.)])\s+", lines[i]):
+        return True
+    if RAW_HTML_RE.match(s):
         return True
     if "|" in lines[i] and i + 1 < len(lines) and _is_table_sep(lines[i + 1]):
         return True
@@ -357,6 +366,15 @@ def md_to_html(src: str, headings: list | None = None) -> str:
             out.append("\n".join(t))
             continue
 
+        # ---- 原生 HTML 块（视频、iframe 之类）：整段照抄，不转义也不套 <p> ----
+        if RAW_HTML_RE.match(s):
+            buf = []
+            while i < n and lines[i].strip():
+                buf.append(lines[i].rstrip())
+                i += 1
+            out.append("\n".join(buf))
+            continue
+
         # ---- 段落 ----
         buf = []
         while i < n and lines[i].strip() and not _is_block_start(lines, i):
@@ -486,6 +504,7 @@ def reading_minutes(body_md: str) -> int:
     """按正文字数估算阅读时长。想固定某个值，在 front matter 里写 minutes: 8。"""
     code_lines = sum(m.group(0).count("\n") for m in re.finditer(r"```.*?```", body_md, re.S))
     plain = re.sub(r"```.*?```", " ", body_md, flags=re.S)
+    plain = re.sub(r"<[^>]*>", " ", plain)          # 原生 HTML 标签本身不算正文
     cjk = len(CJK_RE.findall(plain))
     words = len(re.findall(r"[A-Za-z0-9]+", plain))
     minutes = cjk / READ_CJK_PER_MIN + words / READ_WORD_PER_MIN + code_lines / 15.0
@@ -494,6 +513,7 @@ def reading_minutes(body_md: str) -> int:
 
 def word_count(body_md: str) -> int:
     plain = re.sub(r"```.*?```", " ", body_md, flags=re.S)
+    plain = re.sub(r"<[^>]*>", " ", plain)          # 同上：视频/iframe 的标签不算字
     plain = re.sub(r"[#>*`\[\]()!-]", "", plain)
     return len(CJK_RE.findall(plain)) + len(re.findall(r"[A-Za-z0-9]+", plain))
 
@@ -524,6 +544,8 @@ def load_posts() -> list[dict]:
             "tags": tags,
             "pin": str(meta.get("pin", "")).strip().lower() in ("true", "yes", "1", "on", "是"),
             "summary": meta.get("summary", ""),
+            # type: video 的文章正文只有一段视频，卡片上就不显示「约 N 分钟读完」
+            "kind": (meta.get("type") or "post").strip().lower(),
             "ai": str(meta.get("ai", "true")).strip().lower() not in ("false", "no", "0", "否"),
             "minutes": int(meta["minutes"]) if meta.get("minutes", "").isdigit()
                        else reading_minutes(body),
@@ -651,8 +673,8 @@ def header_block(prefix: str, active: str) -> str:
         "      </button>\n"
         '      <nav class="main-nav">\n'
         '        <a href="%sindex.html"%s>首页</a>\n'
-        '        <a href="%sarchive.html"%s>归档</a>\n'
         '        <a href="%sabout.html"%s>关于</a>\n'
+        '        <a href="%sarchive.html"%s>归档</a>\n'
         '        <button class="theme-toggle" data-action="toggle-theme" aria-label="切换深浅色主题" '
         'aria-pressed="false">\n'
         '          <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" '
@@ -669,7 +691,7 @@ def header_block(prefix: str, active: str) -> str:
         "    </div>\n"
         "  </header>"
         % (prefix, LOGO_MARK, SITE["name"],
-           prefix, cls("home"), prefix, cls("archive"), prefix, cls("about"))
+           prefix, cls("home"), prefix, cls("about"), prefix, cls("archive"))
     )
 
 
@@ -698,19 +720,24 @@ def vt_name(slug: str) -> str:
 def render_card(p: dict, prefix: str = "") -> str:
     badge = ("\n            " + AI_BADGE.replace("\n", "\n            ")) if p["ai"] else ""
     pin = '<span class="tag">置顶</span>' if p.get("pin") else ""
+    video = p.get("kind") == "video"
+    foot = "视频" if video else "约 %d 分钟读完" % p["minutes"]
+    more = "观看 →" if video else "阅读全文 →"
+    # 没有摘要就不输出空段落，免得卡片上多一块空白
+    desc = ('            <p>%s</p>\n' % html.escape(p["summary"])) if p["summary"] else ""
     return (
         '<article class="post-card reveal" style="view-transition-name:%s">\n'
         '            <div class="card-top">%s<span class="tag">%s</span><span>%s</span></div>\n'
         '            <h3><a href="%sposts/%s.html">%s</a></h3>%s\n'
-        '            <p>%s</p>\n'
-        '            <div class="card-foot"><span>约 %d 分钟读完</span>'
-        '<a class="read-more" href="%sposts/%s.html">阅读全文 →</a></div>\n'
+        "%s"
+        '            <div class="card-foot"><span>%s</span>'
+        '<a class="read-more" href="%sposts/%s.html">%s</a></div>\n'
         "          </article>"
         % (
             vt_name(p["slug"]), pin,
             html.escape(p["tags"][0] if p["tags"] else "随笔"),
             p["date"], prefix, p["slug"], html.escape(p["title"]), badge,
-            html.escape(p["summary"]), p["minutes"], prefix, p["slug"],
+            desc, foot, prefix, p["slug"], more,
         )
     )
 
@@ -722,17 +749,18 @@ def render_archive_item(p: dict, prefix: str = "") -> str:
         % (prefix, tag_slug(t), html.escape(t)) for t in p["tags"]
     )
     badge = ("\n            " + AI_BADGE.replace("\n", "\n            ")) if p["ai"] else ""
+    desc = ('            <p>%s</p>\n' % html.escape(p["summary"])) if p["summary"] else ""
     return (
         '<li data-tags="%s">\n'
         '          <span class="date">%s</span>\n'
         "          <div>\n"
         '            <h3><a href="%sposts/%s.html">%s</a></h3>%s\n'
-        "            <p>%s</p>\n"
+        "%s"
         '            <div class="meta-tags">%s</div>\n'
         "          </div>\n"
         "        </li>"
         % (html.escape(",".join(p["tags"])), p["date"], prefix, p["slug"],
-           html.escape(p["title"]), badge, html.escape(p["summary"]), tags)
+           html.escape(p["title"]), badge, desc, tags)
     )
 
 
@@ -744,7 +772,10 @@ def render_post(p: dict, newer: dict | None, older: dict | None) -> str:
     badge = ("\n        " + AI_BADGE.replace("\n", "\n        ")) if p["ai"] else ""
     meta = '          <span class="tag">%s</span>\n' % html.escape(p["tags"][0]) if p["tags"] else ""
     meta += "          <span>%s</span>\n" % p["date"]
-    meta += '          <span>·</span>\n          <span>约 %d 分钟读完</span>' % p["minutes"]
+    if p.get("kind") == "video":
+        meta += '          <span>·</span>\n          <span>视频</span>'
+    else:
+        meta += '          <span>·</span>\n          <span>约 %d 分钟读完</span>' % p["minutes"]
 
     headings: list = []
     body_html = md_to_html(p["body_md"], headings)
@@ -815,6 +846,7 @@ def build_search_index(posts: list[dict]) -> None:
     items = []
     for p in posts:
         plain = re.sub(r"```.*?```", " ", p["body_md"], flags=re.S)
+        plain = re.sub(r"<[^>]*>", " ", plain)        # 标签和属性不算正文
         plain = re.sub(r"[#>*`\[\]()!|~-]", " ", plain)
         plain = re.sub(r"\s+", " ", plain).strip()[:1500]
         items.append({

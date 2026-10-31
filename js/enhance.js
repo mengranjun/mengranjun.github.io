@@ -40,43 +40,65 @@
 
   /* ======================================================================
      6. 首页标题打字机（放最前面，尽早接管，避免闪一下完整标题）
+
+     时间线：
+       0.3s  逐字敲出第一条标语，总时长随机 1~2 秒
+       敲完  光标不消失，留在末尾按固定频率闪
+       +2s   光标一路往左滑（这一段不闪），文字像按住退格键一样被从右往左删掉
+       删完  再逐字敲出第二条标语（写在 h1 的 data-tw-first 里），
+             敲完就永久留着不动了，光标继续闪。
      ====================================================================== */
   (function typewriter() {
     var h1 = $(".hero h1");
     if (!h1 || reduced) return;
 
-    var source = h1.innerHTML;
+    var FINAL_HTML = h1.innerHTML;                                    // 最后永久留在页面上的标语
+    var FIRST_HTML = h1.getAttribute("data-tw-first") || FINAL_HTML;  // 一开始先敲出来的那条
 
-    // 把 HTML 拆成「一个字 / 换行 / 开标签 / 闭标签」的序列
-    var toks = [];
-    (function walk(node) {
-      Array.prototype.forEach.call(node.childNodes, function (n) {
-        if (n.nodeType === 3) {
-          var txt = n.textContent;
-          for (var i = 0; i < txt.length; i++) toks.push({ k: "c", v: txt[i] });
-        } else if (n.nodeType === 1) {
-          if (n.tagName === "BR") { toks.push({ k: "br" }); return; }
-          toks.push({ k: "o", tag: n.tagName, cls: n.className });
-          walk(n);
-          toks.push({ k: "x", tag: n.tagName });
-        }
-      });
-    })((function () { var t = doc.createElement("div"); t.innerHTML = source; return t; })());
+    // 把一段 HTML 拆成「一个字 / 换行 / 开标签 / 闭标签」的序列
+    function tokenize(html) {
+      var list = [];
+      var box = doc.createElement("div");
+      box.innerHTML = html;
+      (function walk(node) {
+        Array.prototype.forEach.call(node.childNodes, function (n) {
+          if (n.nodeType === 3) {
+            var txt = n.textContent;
+            for (var i = 0; i < txt.length; i++) list.push({ k: "c", v: txt[i] });
+          } else if (n.nodeType === 1) {
+            if (n.tagName === "BR") { list.push({ k: "br" }); return; }
+            list.push({ k: "o", tag: n.tagName, cls: n.className });
+            walk(n);
+            list.push({ k: "x", tag: n.tagName });
+          }
+        });
+      })(box);
+      return { toks: list, total: list.filter(function (t) { return t.k === "c"; }).length };
+    }
 
-    var total = toks.filter(function (t) { return t.k === "c"; }).length;
-    if (total < 4) return;
+    var FIRST = tokenize(FIRST_HTML);
+    var FINAL = tokenize(FINAL_HTML);
+    if (!FIRST.total || !FINAL.total) return;
 
-    function paint(n) {
-      // 结构（<br>、<em>）始终完整输出，只控制"字"显示到第几个，
-      // 这样标题高度从头到尾都是两行，不会打字时上下跳。
-      var out = "", open = [], count = 0, caretDone = false;
+    // 只有「先敲的那条」和「最后留下的那条」不一样，才做后面删掉重敲的换字动画。
+    // 没有写 data-tw-first 的页面就只有一段打字 + 光标常亮闪烁。
+    var SWITCH = FIRST_HTML.replace(/\s+/g, "") !== FINAL_HTML.replace(/\s+/g, "");
+
+    var state = { stream: FIRST, n: 0, cls: "is-solid" };
+
+    // 结构（<br>、<em>）始终完整输出，只控制「字」显示到第几个，
+    // 这样标题的行数在打字 / 删字过程中都不变，不会一个字跳一下。
+    function render(stream, n, cls) {
+      var out = "", open = [], count = 0, done = false;
 
       function caret() {
-        if (!caretDone) { out += '<span class="tw-caret" aria-hidden="true"></span>'; caretDone = true; }
+        if (done) return;
+        done = true;
+        out += '<span class="tw-caret ' + cls + '" aria-hidden="true"></span>';
       }
 
-      for (var i = 0; i < toks.length; i++) {
-        var t = toks[i];
+      for (var i = 0; i < stream.toks.length; i++) {
+        var t = stream.toks[i];
         if (t.k === "c") {
           if (count < n) out += esc(t.v);
           else caret();
@@ -93,27 +115,110 @@
       }
       caret();
       while (open.length) out += "</" + open.pop() + ">";
-      h1.innerHTML = out;
+      return out;
     }
 
-    h1.setAttribute("aria-label", h1.textContent);
-    var n = 0;
-    paint(0);
-    // 等首屏淡入动画铺开一点再开始敲，不然字还没显出来就被清掉了
-    window.setTimeout(function () {
-      (function tick() {
-        n++;
-        paint(n);
-        if (n < total) {
-          window.setTimeout(tick, 52 + (Math.random() * 34));
-        } else {
+    var GLIDE = 110;   // 光标滑一格用的时间
+
+    // 重画一帧。glide = true 时用 FLIP 把光标从上一帧的位置滑过来，
+    // 看起来就是光标一路往左推着删字，而不是一格一格地跳。
+    function paint(stream, n, cls, glide) {
+      var before = glide ? $(".tw-caret", h1) : null;
+      var from = before ? before.getBoundingClientRect() : null;
+
+      state = { stream: stream, n: n, cls: cls };
+      h1.innerHTML = render(stream, n, cls);
+      if (!from) return;
+
+      var now = $(".tw-caret", h1);
+      if (!now) return;
+      var to = now.getBoundingClientRect();
+      if (Math.abs(to.top - from.top) > 1) return;   // 换行了就别硬拉，直接过去
+      var dx = from.left - to.left;
+      if (Math.abs(dx) < 0.6) return;
+      now.style.transition = "none";
+      now.style.transform = "translateX(" + dx.toFixed(2) + "px)";
+      void now.offsetWidth;
+      now.style.transition = "transform " + GLIDE + "ms linear";
+      now.style.transform = "translateX(0)";
+    }
+
+    function setCaret(cls) {
+      state.cls = cls;
+      var c = $(".tw-caret", h1);
+      if (c) c.className = "tw-caret " + cls;
+    }
+
+    // 两条标语的行数不一样（第一条一行、第二条两行）。先把最高的那版量出来
+    // 把高度占住，这样标语从一行变两行时，下面的段落和按钮不会被顶下去。
+    function measureHeight() {
+      h1.style.minHeight = "0px";
+      var tall = 0;
+      [FINAL_HTML, FIRST_HTML].forEach(function (html) {
+        h1.innerHTML = html;
+        tall = Math.max(tall, h1.offsetHeight);
+      });
+      h1.style.minHeight = tall ? tall + "px" : "";
+      h1.innerHTML = render(state.stream, state.n, state.cls);
+    }
+
+    var resizeTimer = 0;
+    window.addEventListener("resize", function () {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(measureHeight, 200);
+    });
+
+    // 每个字的出现时间：总时长给定，单字间隔在均值上下浮动，读起来更像手敲
+    function schedule(total, span) {
+      var w = [], sum = 0, i, v;
+      for (i = 0; i < total; i++) { v = 0.6 + Math.random() * 0.8; w.push(v); sum += v; }
+      var out = [], t = 0;
+      for (i = 0; i < total; i++) { t += (w[i] / sum) * span; out.push(t); }
+      return out;
+    }
+
+    var FIRST_MS = [1000, 2000];    // 开头那句的打印时长（随机）
+    var SECOND_MS = [2000, 3000];   // 后面换上去的新标语字数多，节奏给慢一点
+    var HOLD = 2000;                // 第一条打完后，光标自己闪多久再开始换字
+    var WAIT = 320;                 // 等首屏淡入铺开一点再开始敲
+
+    function span(ms) { return ms[0] + Math.random() * (ms[1] - ms[0]); }
+
+    function typeIn(stream, span, done) {
+      var at = schedule(stream.total, span);
+      for (var i = 0; i < at.length; i++) {
+        (function (k) {
+          window.setTimeout(function () { paint(stream, k + 1, "is-solid"); }, at[k]);
+        })(i);
+      }
+      window.setTimeout(done, at[at.length - 1] + 80);
+    }
+
+    // 光标一路往左，把字一个个删掉（这一段光标不闪）
+    function backspace() {
+      var n = FIRST.total;
+      (function step() {
+        if (n <= 0) {
           window.setTimeout(function () {
-            var c = $(".tw-caret", h1);
-            if (c) c.remove();
-          }, 900);
+            typeIn(FINAL, span(SECOND_MS), function () { setCaret("is-blink"); });
+          }, 300);
+          return;
         }
+        n--;
+        paint(FIRST, n, "is-solid", true);
+        window.setTimeout(step, 78 + Math.random() * 66);
       })();
-    }, reduced ? 0 : 300);
+    }
+
+    h1.setAttribute("aria-label", h1.textContent.replace(/\s+/g, " ").trim());
+    measureHeight();          // 顺便把第一帧（只有光标、没有字）画好
+
+    window.setTimeout(function () {
+      typeIn(FIRST, span(FIRST_MS), function () {
+        setCaret("is-blink");   // 敲完光标不消失，留在末尾按固定频率闪
+        if (SWITCH) window.setTimeout(backspace, HOLD);
+      });
+    }, WAIT);
   })();
 
 

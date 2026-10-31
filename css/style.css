@@ -535,6 +535,23 @@ main { flex: 1; }
 
 .article-body img { border-radius: 10px; margin: 0.4em 0 1.4em; }
 
+/* ---------- 视频（正文里只有一个 <video> 或 <iframe> 的那种文章）---------- */
+.article-body video,
+.article-body iframe {
+  display: block;
+  width: 100%;
+  margin: 0.2em 0 1.4em;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #000;
+  box-shadow: var(--shadow);
+}
+
+/* auto 16/9：视频还没加载出尺寸时先按 16:9 占位，加载后按视频自己的比例显示 */
+.article-body video { height: auto; aspect-ratio: auto 16 / 9; }
+
+.article-body iframe { aspect-ratio: 16 / 9; } /* B 站 / YouTube 的嵌入一般是 16:9 */
+
 .article-body del { color: var(--text-muted); }
 
 /* ---------- Tables ---------- */
@@ -1083,6 +1100,7 @@ main { flex: 1; }
 .hero .container { position: relative; z-index: 1; }
 
 /* ---------- 3. 首页标题：打字机 ---------- */
+/* 默认常亮（打字、退格时都不闪），停下来才加上 .is-blink 按固定频率闪 */
 .tw-caret {
   display: inline-block;
   width: 0.06em;
@@ -1090,8 +1108,10 @@ main { flex: 1; }
   margin-left: 0.06em;
   vertical-align: -0.1em;
   background: var(--accent);
-  animation: twBlink 1s steps(1, end) infinite;
+  border-radius: 1px;
 }
+
+.tw-caret.is-blink { animation: twBlink 1s steps(1, end) infinite; }
 
 @keyframes twBlink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
 
@@ -1384,7 +1404,7 @@ main { flex: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .alias::after { animation: none; }
-  .tw-caret { animation: none; }
+  .tw-caret.is-blink { animation: none; }
   .hero::after { transition: none; }
   .about-swap > p { transition: none; filter: none; }
   .about-swap-alt { filter: none; }
