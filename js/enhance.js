@@ -46,7 +46,8 @@
        敲完  光标不消失，留在末尾按固定频率闪
        +2s   光标一路往左滑（这一段不闪），文字像按住退格键一样被从右往左删掉
        删完  再逐字敲出第二条标语（写在 h1 的 data-tw-first 里），
-             敲完就永久留着不动了，光标继续闪。
+             敲到第一行结束时标题才长高一行，把下面的副标题和按钮丝滑顶开，
+             然后接着往下打；敲完就永久留着不动了，光标继续闪。
      ====================================================================== */
   (function typewriter() {
     var h1 = $(".hero h1");
@@ -86,8 +87,9 @@
 
     var state = { stream: FIRST, n: 0, cls: "is-solid" };
 
-    // 结构（<br>、<em>）始终完整输出，只控制「字」显示到第几个，
-    // 这样标题的行数在打字 / 删字过程中都不变，不会一个字跳一下。
+    // 只控制「字」显示到第几个。<em> 这类行内标签始终完整输出；
+    // <br> 要等这一行的字全打完了才出现 —— 这样第一行期间标题只有一行高（不留空），
+    // 等真要换到第二行时标题才长高，下面的内容也就有了「被顶开」的时机。
     function render(stream, n, cls) {
       var out = "", open = [], count = 0, done = false;
 
@@ -104,7 +106,10 @@
           else caret();
           count++;
         } else if (t.k === "br") {
-          out += "<br>";
+          if (count <= n) {
+            if (count === n) caret();   // 这一行刚好打完：光标先停在行尾，再空出第二行
+            out += "<br>";
+          }
         } else if (t.k === "o") {
           out += "<" + t.tag + (t.cls ? ' class="' + t.cls + '"' : "") + ">";
           open.push(t.tag);
@@ -118,16 +123,50 @@
       return out;
     }
 
-    var GLIDE = 110;   // 光标滑一格用的时间
+    var GLIDE = 110;    // 光标滑一格用的时间
+    var PUSH_MS = 320;  // 标语从一行变两行时，把下面的内容顶下去用的时间
+
+    // 标题后面那些会跟着一起下移的兄弟节点（生日蛋糕之类绝对定位的不算）
+    function flowBelow() {
+      return $$(".hero .container > *").filter(function (el) {
+        if (el === h1) return false;
+        var pos = getComputedStyle(el).position;
+        return pos !== "absolute" && pos !== "fixed";
+      });
+    }
+
+    // 标题长高了一行：先把下面的内容按 FLIP 拽回原位，再滑到新位置。
+    // 看上去就是标题把副标题和按钮「顶开」，而不是整个页面跳一下。
+    function slideDown(nodes, tops) {
+      nodes.forEach(function (el, i) {
+        var dy = tops[i] - el.getBoundingClientRect().top;
+        if (Math.abs(dy) < 0.5) return;
+        el.style.transition = "none";
+        el.style.transform = "translateY(" + dy.toFixed(2) + "px)";
+        void el.offsetWidth;
+        el.style.transition = "transform " + PUSH_MS + "ms cubic-bezier(0.22, 1, 0.36, 1)";
+        el.style.transform = "translateY(0)";
+      });
+    }
 
     // 重画一帧。glide = true 时用 FLIP 把光标从上一帧的位置滑过来，
     // 看起来就是光标一路往左推着删字，而不是一格一格地跳。
     function paint(stream, n, cls, glide) {
       var before = glide ? $(".tw-caret", h1) : null;
       var from = before ? before.getBoundingClientRect() : null;
+      var below = flowBelow();
+      var tops = below.map(function (el) { return el.getBoundingClientRect().top; });
+      var was = h1.offsetHeight;
 
       state = { stream: stream, n: n, cls: cls };
       h1.innerHTML = render(stream, n, cls);
+
+      // 第一行打完、第二行还没字的时候，先把第二行的高度空出来（见 CSS 的 .is-two-line）。
+      // 这样「顶开」发生在第二行开始打字之前，新字不会跟正在下移的副标题叠在一起。
+      var brAt = brChars(stream);
+      if (brAt > 0 && n >= brAt) h1.classList.add("is-two-line");
+
+      if (h1.offsetHeight - was > 0.5) slideDown(below, tops);   // 标语多出一行
       if (!from) return;
 
       var now = $(".tw-caret", h1);
@@ -149,32 +188,29 @@
       if (c) c.className = "tw-caret " + cls;
     }
 
-    // 两条标语的行数不一样（第一条一行、第二条两行）。先把最高的那版量出来
-    // 把高度占住，这样标语从一行变两行时，下面的段落和按钮不会被顶下去。
-    function measureHeight() {
-      h1.style.minHeight = "0px";
-      var tall = 0;
-      [FINAL_HTML, FIRST_HTML].forEach(function (html) {
-        h1.innerHTML = html;
-        tall = Math.max(tall, h1.offsetHeight);
-      });
-      h1.style.minHeight = tall ? tall + "px" : "";
-      h1.innerHTML = render(state.stream, state.n, state.cls);
-    }
-
-    var resizeTimer = 0;
-    window.addEventListener("resize", function () {
-      window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(measureHeight, 200);
-    });
-
-    // 每个字的出现时间：总时长给定，单字间隔在均值上下浮动，读起来更像手敲
-    function schedule(total, span) {
+    // 每个字的出现时间：总时长给定，单字间隔在均值上下浮动，读起来更像手敲。
+    // pauseAt 是换行前那一行的字数：它后面的字整体推迟 pauseMs，
+    // 好让「顶开」的动画在第二行开始打字之前播完。
+    function schedule(total, span, pauseAt, pauseMs) {
       var w = [], sum = 0, i, v;
       for (i = 0; i < total; i++) { v = 0.6 + Math.random() * 0.8; w.push(v); sum += v; }
       var out = [], t = 0;
       for (i = 0; i < total; i++) { t += (w[i] / sum) * span; out.push(t); }
+      if (pauseAt > 0 && pauseMs > 0) {
+        for (i = pauseAt; i < out.length; i++) out[i] += pauseMs;
+      }
       return out;
+    }
+
+    // 这条标语里，换行符前面有几个字（没有换行就返回 -1）
+    function brChars(stream) {
+      var c = 0;
+      for (var i = 0; i < stream.toks.length; i++) {
+        var t = stream.toks[i];
+        if (t.k === "c") c++;
+        else if (t.k === "br") return c;
+      }
+      return -1;
     }
 
     var FIRST_MS = [1000, 2000];    // 开头那句的打印时长（随机）
@@ -185,7 +221,7 @@
     function span(ms) { return ms[0] + Math.random() * (ms[1] - ms[0]); }
 
     function typeIn(stream, span, done) {
-      var at = schedule(stream.total, span);
+      var at = schedule(stream.total, span, brChars(stream), PUSH_MS);
       for (var i = 0; i < at.length; i++) {
         (function (k) {
           window.setTimeout(function () { paint(stream, k + 1, "is-solid"); }, at[k]);
@@ -211,7 +247,7 @@
     }
 
     h1.setAttribute("aria-label", h1.textContent.replace(/\s+/g, " ").trim());
-    measureHeight();          // 顺便把第一帧（只有光标、没有字）画好
+    paint(FIRST, 0, "is-solid");   // 第一帧：只有光标、没有字，标题就一行高
 
     window.setTimeout(function () {
       typeIn(FIRST, span(FIRST_MS), function () {

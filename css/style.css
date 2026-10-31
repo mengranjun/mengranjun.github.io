@@ -1115,6 +1115,10 @@ main { flex: 1; }
 
 @keyframes twBlink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
 
+/* 第一行打完时由 enhance.js 加上：先把第二行的高度空出来（2 × 行高 1.22em），
+   这样“顶开”发生在第二行开始打字之前，下面的副标题不会跟新字叠在一起。 */
+.hero h1.is-two-line { min-height: 2.44em; }
+
 /* ---------- 4. 命令面板（Ctrl / Cmd + K） ---------- */
 .cmdk {
   position: fixed;
@@ -1623,10 +1627,10 @@ a.tag:hover { opacity: 1; color: #fff; background: var(--accent); }
   to   { opacity: 1; transform: none; }
 }
 
-/* 只在有 JS 时隐藏再淡入，禁用 JS 的读者直接看到完整内容 */
+/* 只在有 JS 时淡入。「先藏起来」交给动画的 backwards 填充，基础样式保持可见，
+   这样动画播完就不再占用 transform —— 打字机才能用 transform 把副标题「顶开」。 */
 .js .hero .container > *:not(.bday-cake) {
-  opacity: 0;
-  animation: heroIn 0.62s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: heroIn 0.62s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .js .hero .container > *:nth-child(1) { animation-delay: 0.05s; }
