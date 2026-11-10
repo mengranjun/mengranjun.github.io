@@ -1786,3 +1786,202 @@ a.tag:hover { opacity: 1; color: #fff; background: var(--accent); }
   .bday-cake { transition: opacity 0.01s; }
   .bday-cake.is-pop .bday-body { animation: none; }
 }
+
+/* ==========================================================================
+   小工具集合页 · tools.html
+   卡片使用 squircle（超椭圆）连续曲率圆角，由 js/tools.js 按
+   每张卡片的实际像素尺寸生成 clip-path: path(...)。
+   无 JS 时回退到下面的 border-radius（普通圆角，仍可用）。
+   ========================================================================== */
+
+.tools-hero { padding: 3rem 0 0.5rem; }
+.tools-hero h1 {
+  font-family: var(--font-serif);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+}
+.tools-hero p {
+  color: var(--text-muted);
+  margin-top: 0.6rem;
+  max-width: 42em;
+  line-height: 1.7;
+}
+
+.tool-toolbar {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 1.6rem 0 1.3rem;
+}
+.tool-search {
+  flex: 1 1 220px;
+  min-width: 180px;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.tool-search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.tool-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.tool-chip {
+  padding: 0.32rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.tool-chip:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.tool-chip.is-on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.tool-count {
+  width: 100%;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.2rem;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.1rem;
+  padding-bottom: 3rem;
+}
+
+/* ---- 卡片：squircle 由 JS 写 clip-path；这里给无 JS 的回退圆角 ---- */
+.tool-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.4rem 1.3rem 1.25rem;
+  min-height: 172px;
+  background: var(--surface);
+  border-radius: 26px;                 /* 无 JS 回退；有 JS 时被 clip-path 覆盖 */
+  filter: drop-shadow(0 1px 2px rgba(9, 40, 52, 0.05))
+          drop-shadow(0 10px 22px rgba(9, 40, 52, 0.08));
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              filter 0.35s ease;
+  contain: layout;
+}
+[data-theme="dark"] .tool-card {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))
+          drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+}
+.tool-card.is-link { cursor: pointer; }
+.tool-card.is-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.tool-card:hover {
+  transform: translateY(-5px);
+  filter: drop-shadow(0 2px 5px rgba(9, 40, 52, 0.07))
+          drop-shadow(0 18px 34px rgba(9, 40, 52, 0.13));
+}
+[data-theme="dark"] .tool-card:hover {
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.4))
+          drop-shadow(0 18px 34px rgba(0, 0, 0, 0.55));
+}
+
+.tool-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  line-height: 1;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tool-icon--svg { padding: 6px; }
+.tool-icon--svg svg { width: 100%; height: 100%; }
+
+.tool-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  letter-spacing: -0.005em;
+}
+.tool-desc {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.tool-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 0.4rem;
+}
+.tool-tag {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--accent-soft);
+}
+
+.tool-go {
+  position: absolute;
+  right: 1.15rem;
+  bottom: 1rem;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 500;
+  opacity: 0.65;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.tool-card:hover .tool-go { opacity: 1; transform: translateX(3px); }
+
+/* ---- 计划中（未实现）的卡片：置灰 + 角标 ---- */
+.tool-card.is-planned {
+  background: color-mix(in srgb, var(--surface) 55%, var(--bg));
+}
+.tool-card.is-planned .tool-icon { opacity: 0.5; }
+.tool-card.is-planned .tool-title { color: var(--text-muted); }
+.tool-card.is-planned::after {
+  content: "敬请期待";
+  position: absolute;
+  right: 1.15rem;
+  bottom: 1rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.tool-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-muted);
+  padding: 3.5rem 0;
+  font-size: 0.95rem;
+}
+
+/* 无 JS 回退：让卡片至少是普通圆角，hover 仍有反馈 */
+html:not(.js) .tool-card:hover { transform: none; }
+
+@media (max-width: 540px) {
+  .tool-grid { grid-template-columns: 1fr; }
+  .tools-hero { padding-top: 2rem; }
+}

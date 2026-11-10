@@ -675,6 +675,7 @@ def header_block(prefix: str, active: str) -> str:
         '        <a href="%sindex.html"%s>首页</a>\n'
         '        <a href="%sabout.html"%s>关于</a>\n'
         '        <a href="%sarchive.html"%s>归档</a>\n'
+        '        <a href="%stools.html"%s>小工具</a>\n'
         '        <button class="theme-toggle" data-action="toggle-theme" aria-label="切换深浅色主题" '
         'aria-pressed="false">\n'
         '          <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" '
@@ -691,7 +692,8 @@ def header_block(prefix: str, active: str) -> str:
         "    </div>\n"
         "  </header>"
         % (prefix, LOGO_MARK, SITE["name"],
-           prefix, cls("home"), prefix, cls("about"), prefix, cls("archive"))
+           prefix, cls("home"), prefix, cls("about"), prefix, cls("archive"),
+           prefix, cls("tools"))
     )
 
 
@@ -703,12 +705,13 @@ def footer_block(prefix: str) -> str:
         '      <div class="footer-links">\n'
         '        <a href="%sarchive.html">归档</a>\n'
         '        <a href="%sabout.html">关于</a>\n'
+        '        <a href="%stools.html">小工具</a>\n'
         '        <a href="%sfeed.xml">RSS</a>\n'
         '        <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>\n'
         "      </div>\n"
         "    </div>\n"
         "  </footer>"
-        % (dt.date.today().year, SITE["name"], prefix, prefix, prefix)
+        % (dt.date.today().year, SITE["name"], prefix, prefix, prefix, prefix)
     )
 
 
@@ -1037,7 +1040,7 @@ def build_heatmap(posts: list[dict]) -> str:
 
 def build_sitemap(posts: list[dict]) -> None:
     base = SITE["url"].rstrip("/")
-    urls = [("", "1.0"), ("archive.html", "0.6"), ("about.html", "0.5")]
+    urls = [("", "1.0"), ("archive.html", "0.6"), ("about.html", "0.5"), ("tools.html", "0.5")]
     urls += [("posts/%s.html" % p["slug"], "0.8") for p in posts]
     urls += [("tags/index.html", "0.5")]
     urls += [("tags/%s.html" % tag_slug(t), "0.4") for t in collect_tags(posts)]
@@ -1226,7 +1229,7 @@ def cmd_url(new_url: str) -> int:
         SITE["url"] = new_url
 
     # 2) 替换静态页面里写死的 canonical / og:url / og:image / feed.xml 地址
-    targets = ["index.html", "archive.html", "about.html", "404.html", "README.md", "README2.md"]
+    targets = ["index.html", "archive.html", "about.html", "tools.html", "404.html", "README.md", "README2.md"]
     changed = 0
     for name in targets:
         f = ROOT / name

@@ -655,6 +655,7 @@
       { t: "首页", u: "index.html", kind: "页面" },
       { t: "归档", u: "archive.html", kind: "页面" },
       { t: "关于", u: "about.html", kind: "页面" },
+      { t: "小工具", u: "tools.html", kind: "页面" },
       { t: "RSS 订阅", u: "feed.xml", kind: "页面" }
     ];
 

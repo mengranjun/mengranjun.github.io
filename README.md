@@ -249,7 +249,7 @@ ai: true
 
 1. 把视频文件放进根目录的 `video/` 文件夹，例如 `video/demo.mp4`；
 2. 打开 `posts/video.md`，把 `<video ... src="../video/xxx.mp4">` 里的文件名改成你的；
-3. 运行 `python build.py`，再刷新 `posts/video.html`。
+3. 运行 `python build.py`，再刷新 `posts/LonlyHalloween.html`。
 
 视频放在 B 站的话，把那行 `<video>` 换成
 `<iframe src="https://player.bilibili.com/player.html?bvid=这里填BV号" allowfullscreen></iframe>`，
