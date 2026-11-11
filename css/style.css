@@ -213,6 +213,9 @@ main { flex: 1; }
 
 .hero h1 em { font-style: normal; color: var(--accent); }
 
+/* 标语末尾的「作品。」整体不拆行：窄屏换行时不会只剩一个孤字成段 */
+.hero h1 .nb { white-space: nowrap; }
+
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   .hero h1 em {
     background: var(--brand-grad);
@@ -276,7 +279,8 @@ main { flex: 1; }
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  /* min(300px, 100%)：容器比 300px 还窄时（小屏手机）允许列收缩，避免横向溢出 */
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: 22px;
 }
 
@@ -1052,21 +1056,35 @@ main { flex: 1; }
     top: 64px; left: 0; right: 0;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    flex-direction: column;
-    align-items: stretch;
+    /* 用「换行」代替竖排：每个链接占满一行，末尾两个圆形按钮自动并到同一行 */
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
     padding: 12px 20px 18px;
-    gap: 4px;
+    gap: 4px 8px;
     display: none;
   }
 
   .main-nav.open { display: flex; }
-  .main-nav a { padding: 12px 14px; }
+  .main-nav a { flex: 0 0 100%; padding: 12px 14px; }
+  .main-nav .nav-search { margin-left: 0; }
   .theme-toggle { margin-left: 0; }
 
   .post-list li { grid-template-columns: 1fr; gap: 6px; }
   .about-grid { grid-template-columns: 1fr; gap: 30px; }
   .about-side { position: static; }
   .hero { padding: 56px 0 44px; }
+}
+
+/* 手机窄屏：标题略缩一号，让第二段标语尽量落在一行内，
+   配合 .hero h1 .nb 避免出现「独字成段」的末行 */
+@media (max-width: 440px) {
+  .hero h1 { font-size: clamp(1.7rem, 7.4vw, 2.1rem); }
+}
+
+/* 超窄屏（≤340px）：标题再收一号，第一段标语也能保持整行 */
+@media (max-width: 340px) {
+  .hero h1 { font-size: 1.55rem; }
 }
 
 /* ==========================================================================
@@ -1106,6 +1124,8 @@ main { flex: 1; }
   width: 0.06em;
   height: 0.92em;
   margin-left: 0.06em;
+  /* 负右边距抵消自身占位：光标净宽为 0，行末打满时不会另起一行占高度 */
+  margin-right: -0.12em;
   vertical-align: -0.1em;
   background: var(--accent);
   border-radius: 1px;
@@ -1859,7 +1879,7 @@ a.tag:hover { opacity: 1; color: #fff; background: var(--accent); }
 
 .tool-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 1.1rem;
   padding-bottom: 3rem;
 }

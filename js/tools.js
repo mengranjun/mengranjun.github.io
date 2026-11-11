@@ -151,19 +151,51 @@
      在角部平滑过渡。这里按每张卡片的实际像素尺寸生成 path，写到 clip-path。
      无 JS 时回退到 CSS 的 border-radius（仍是普通圆角，但不影响可用性）。
      ====================================================================== */
-  var SQUIRCLE_N = 4;          // 超椭圆指数，越大越接近直角；4 = 经典 squircle
-  var SQUIRCLE_STEPS = 80;     // 路径采样点数
+  /* ======================================================================
+     4. squircle（连续曲率圆角）
+     border-radius 的圆角是圆弧，弧与直边相接处曲率会「突然归零」，
+     视觉上留下一道生硬的接缝。Apple 式做法的思路是：角部沿超椭圆曲线
+     过渡（曲率连续变化），再平滑地接入直边。
+     这里为每张卡片按实际像素尺寸生成「直边 + 四段超椭圆转角」的路径，
+     写到 clip-path。转角尺寸随卡片自适应，指数 n≈5 接近 iOS 图标观感。
+     无 JS 时回退到 CSS 的 border-radius（普通圆角，仍可用）。
+     ====================================================================== */
+  var SQUIRCLE_N = 5;          // 超椭圆指数：越大角部越「方」，5 接近 iOS
+  var SQUIRCLE_STEPS = 14;     // 每个转角的采样段数
 
-  function squirclePath(w, h, n, steps) {
-    var cx = w / 2, cy = h / 2, a = w / 2, b = h / 2;
-    var exp = 2 / n;            // 超椭圆参数化里的指数
+  function squirclePath(w, h, n) {
+    var exp = 2 / n;
+    // 转角尺寸随卡片短边自适应（18~30px），再按半宽半高兜底
+    var r = Math.min(Math.max(18, Math.min(w, h) * 0.14), 30);
+    r = Math.min(r, w / 2, h / 2);
+
+    // 以 (cx, cy) 为中心、半径 r 的超椭圆象限；a0 为起始角，跨 90°
+    function corner(cx, cy, a0) {
+      var pts = [];
+      for (var i = 0; i <= SQUIRCLE_STEPS; i++) {
+        var t = a0 + (i / SQUIRCLE_STEPS) * Math.PI / 2;
+        var c = Math.cos(t), s = Math.sin(t);
+        pts.push([
+          cx + r * Math.sign(c) * Math.pow(Math.abs(c), exp),
+          cy + r * Math.sign(s) * Math.pow(Math.abs(s), exp)
+        ]);
+      }
+      return pts;
+    }
+
+    // 顺时针：上边 → 右上角 → 右边 → 右下角 → 下边 → 左下角 → 左边 → 左上角
+    var pts = [[r, 0]];
+    pts = pts.concat(corner(w - r, r, -Math.PI / 2));       // 右上
+    pts.push([w, h - r]);
+    pts = pts.concat(corner(w - r, h - r, 0));              // 右下
+    pts.push([r, h]);
+    pts = pts.concat(corner(r, h - r, Math.PI / 2));        // 左下
+    pts.push([0, r]);
+    pts = pts.concat(corner(r, r, Math.PI));                // 左上
+
     var d = "";
-    for (var i = 0; i <= steps; i++) {
-      var t = (i / steps) * Math.PI * 2;
-      var c = Math.cos(t), s = Math.sin(t);
-      var x = cx + a * Math.sign(c) * Math.pow(Math.abs(c), exp);
-      var y = cy + b * Math.sign(s) * Math.pow(Math.abs(s), exp);
-      d += (i === 0 ? "M " : "L ") + x.toFixed(2) + " " + y.toFixed(2) + " ";
+    for (var j = 0; j < pts.length; j++) {
+      d += (j === 0 ? "M " : "L ") + pts[j][0].toFixed(2) + " " + pts[j][1].toFixed(2) + " ";
     }
     return d + "Z";
   }
@@ -172,7 +204,7 @@
     if (!el || !el.getBoundingClientRect) return;
     var r = el.getBoundingClientRect();
     if (r.width < 4 || r.height < 4) return;
-    var p = 'path("' + squirclePath(r.width, r.height, SQUIRCLE_N, SQUIRCLE_STEPS) + '")';
+    var p = 'path("' + squirclePath(r.width, r.height, SQUIRCLE_N) + '")';
     el.style.clipPath = p;
     el.style.webkitClipPath = p;
   }
