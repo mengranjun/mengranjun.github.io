@@ -27,13 +27,22 @@
   "use strict";
   window.MUROJ_TOOLS = [
     {
-      id: "palace-panorama",
+      id: "MSpan",
       title: "网页转盘",
       desc: "AI写的，点开即用。",
       icon: "🧱",
       tags: ["小工具", "分享", "开发"],
       type: "external",
       url: "https://776f2403d0974518badce27d4e1d0ea0.sh4.agentos-app.net/"
+    },
+    {
+      id: "MSpan",
+      title: "工具娃！",
+      desc: "包含了更多工具",
+      icon: "🐸",
+      tags: ["小工具", "分享", "开发"],
+      type: "external",
+      url: "https://toolwa.com/"
     },
     {
       id: "palace-panorama",
