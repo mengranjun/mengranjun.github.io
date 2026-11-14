@@ -640,7 +640,7 @@ main { flex: 1; }
      ① 鼠标移到「孟然君」上 → 菜单展开、复选框亮起并画出对勾
      ② 滚轮上/下 → 复选框在名字列表里上下滑动，显示的名字跟着切换
      ③ 鼠标移开后菜单「保持展开」（按 Esc 或点别处才收起）
-   移动端：点一下名字就切换到下一个名字。
+   鼠标点击 / 手指轻点：1→2→…→末尾→…→2→1，重复往返。
    状态由 js/enhance.js 给 .alias 加 .is-open 来驱动；
    没有 JS 时下面的 :hover / :focus 规则仍然能让菜单弹出来。
    外面那圈「小黑/白框 + 四角括号 + 呼吸点」是给读者的提示。
@@ -652,6 +652,8 @@ main { flex: 1; }
   display: inline-grid;      /* grid 容器会忽略空白文本节点，排版更稳 */
   position: relative;
   cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
   outline: none;
   padding: 0.02em 0.5em 0.06em;
   border: 1px solid color-mix(in srgb, var(--text-strong) 32%, transparent);
@@ -750,6 +752,7 @@ main { flex: 1; }
 /* 没有 JS 时的兜底：只显示第一个名字 */
 .alias-name:first-child { --off: 0; opacity: 1; }
 .alias-name.is-on { opacity: 1; }
+.js .alias-name:not(.is-on) { opacity: 0; }
 
 /* 纯拉丁字母的名字用无衬线粗体，和中文名分开处理 */
 .alias-name.is-latin {
@@ -930,13 +933,9 @@ main { flex: 1; }
 .alias.is-open .alias-check-tick { transition-delay: 0.26s; }
 
 /* ============================================================
-   描述 · 方案 B【当前启用】：跟着「当前选中的名字」替换
-   选中第 1 个名字 → 显示 default；选中第 2 个及以后的 → 显示 alt。
-   .alias.is-alt 由 js/enhance.js 在切换名字时维护，
-   所以不会再出现「明明选着孟然君，描述却变成 Muroj 的」这种情况。
-   两段文字叠在同一格、同一位置：只改 opacity 和一点点模糊，
-   不做位移，所以两段话看起来落在完全相同的位置上。
-   想停用：把 about.html 里整个 <div class="about-swap"> 注释掉。
+   名字介绍：每个 <p data-name="名字"> 对应一个名字。
+   JS 每次切换都直接更新 .is-on，同时测量当前介绍的高度。
+   下方 default / alt 规则仅用于兼容旧的两段介绍页面。
    ============================================================ */
 .about-swap { display: grid; align-items: start; }
 
@@ -944,6 +943,17 @@ main { flex: 1; }
   grid-area: 1 / 1;
   margin-bottom: 1.2em;
   transition: opacity 0.42s ease, filter 0.42s ease;
+}
+
+.about-swap-multi > p {
+  opacity: 0;
+  filter: blur(3px);
+  pointer-events: none;
+}
+.about-swap-multi > p.is-on {
+  opacity: 1;
+  filter: blur(0);
+  pointer-events: auto;
 }
 
 .about-swap-alt { opacity: 0; filter: blur(3px); pointer-events: none; }

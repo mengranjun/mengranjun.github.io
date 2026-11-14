@@ -22,6 +22,10 @@
      1. 在 tools/ 目录下新建子目录 tools/<id>/
      2. 在里面放该工具的 index.html（及所需 js/css）
      3. 把本文件里对应条目的 type 改成 "native"，url 改成 "tools/<id>/"
+
+   —— 命名规范 ——
+     1.双拼（小鹤）命名法：适用于中文网站，仅人添加命名
+     2.英语命名：适用于英文、国外无译名网站。
    ========================================================================== */
 (function () {
   "use strict";
@@ -36,13 +40,22 @@
       url: "https://776f2403d0974518badce27d4e1d0ea0.sh4.agentos-app.net/"
     },
     {
-      id: "MSpan",
+      id: "GsJuWa",
       title: "工具娃！",
       desc: "包含了更多工具",
       icon: "🐸",
       tags: ["小工具", "分享", "开发"],
       type: "external",
       url: "https://toolwa.com/"
+    },
+    {
+      id: "Skills.sh",
+      title: "Skills网站",
+      desc: "列举了Github中，上榜的SKILL。",
+      icon: "🔨",
+      tags: ["小工具", "分享", "AI"],
+      type: "external",
+      url: "https://www.skills.sh/"
     },
     {
       id: "palace-panorama",

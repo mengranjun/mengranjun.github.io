@@ -9,7 +9,7 @@
    4. 命令面板 Ctrl / Cmd + K
    5. 文章目录的滚动高亮
    6. 首页标题打字机
-   7. 姓名彩蛋（多名字 + 滚轮切换）
+   7. 姓名彩蛋（多名字 + 滚轮 / 点击往返切换）
    8. 回到顶部 + 阅读进度环
    9. 继续阅读提示（记住上次读到哪）
    ========================================================================== */
@@ -364,7 +364,7 @@
   /* ======================================================================
      7. 姓名彩蛋：支持任意多个名字 +「余韵」
      桌面端：悬浮展开菜单 → 滚轮在名字之间切换 → 鼠标移开菜单保持展开
-     移动端：点一下切到下一个名字
+     桌面 / 移动端：点击按 1→2→…→末尾→…→2→1 的顺序往返
      键盘  ：聚焦后 ↑ / ↓ 切换，Esc 收起
      ====================================================================== */
   (function aliasSwitcher() {
@@ -372,16 +372,53 @@
     if (!alias) return;
 
     var menu = $(".alias-menu", alias);
-    var opts = $$(".alias-opt", alias);
-    var names = $$(".alias-name", alias);
     var stage = $(".alias-stage", alias);
     var grid = $(".about-grid");
+    var swap = $(".about-swap", grid || doc);
+    var multi = !!(swap && swap.classList.contains("about-swap-multi"));
+    var descriptions = swap ? Array.prototype.filter.call(swap.children, function (el) {
+      return el.tagName === "P";
+    }) : [];
+
+    /* 多名字版只有一个数据来源：about.html 的介绍段落。
+       每个 <p data-name="名字">介绍</p> 自动生成菜单和名字，不必维护三份名单。
+       保留旧页面的静态名单 / default + alt 写法，备份页也能继续工作。 */
+    var menuList = $(".alias-list", alias);
+    var namedDescriptions = descriptions.filter(function (el) {
+      return (el.getAttribute("data-name") || "").trim();
+    });
+    if (multi && menuList && stage && namedDescriptions.length) {
+      descriptions.forEach(function (el) {
+        if (namedDescriptions.indexOf(el) >= 0) return;
+        // 漏写 data-name 的段落不应让已有名字全部失效。
+        el.classList.remove("is-on");
+        el.setAttribute("aria-hidden", "true");
+        if (window.console) console.warn("名字介绍缺少 data-name，已跳过该段落。", el);
+      });
+      descriptions = namedDescriptions;
+      menuList.textContent = "";
+      stage.textContent = "";
+      descriptions.forEach(function (el) {
+        var label = el.getAttribute("data-name").trim();
+        var opt = doc.createElement("span");
+        opt.className = "alias-opt";
+        opt.textContent = label;
+        menuList.appendChild(opt);
+        var name = doc.createElement("span");
+        name.className = "alias-name";
+        name.textContent = label;
+        stage.appendChild(name);
+      });
+    }
+    var opts = $$(".alias-opt", alias);
+    var names = $$(".alias-name", alias);
     var n = Math.min(opts.length, names.length);
     if (!menu || n < 1) return;
 
     var coarseMq = window.matchMedia ? window.matchMedia("(hover: none), (pointer: coarse)") : null;
     var coarse = !!(coarseMq && coarseMq.matches);
     var cur = 0;
+    var clickDirection = 1;  // 在两端自动折返；名字数量从上方 HTML 自动读取。
     var open = false;
     var timer = null;
     var CHOSEN = "muroj-alias-chosen";
@@ -455,21 +492,42 @@
       });
       // 描述跟着「当前选中的名字」走，而不是跟着「菜单开着」走
       alias.classList.toggle("is-alt", cur > 0);
+      alias.setAttribute("aria-label", names[cur].textContent.trim() + "，点击切换名字，也可使用方向键");
+      if (multi) {
+        var selectedDescription = Math.min(cur, descriptions.length - 1);
+        descriptions.forEach(function (el, i) {
+          el.classList.toggle("is-on", i === selectedDescription);
+          el.setAttribute("aria-hidden", i === selectedDescription ? "false" : "true");
+        });
+      }
       fitName();   // 外框宽度跟着当前名字走
+      if (fitSwap) fitSwap();  // 每次选择都直接同步，不能依赖 is-alt 是否改变。
     }
 
     function setOpen(v) {
       open = v;
       if (v) placeMenu();
       alias.classList.toggle("is-open", v);
+      alias.setAttribute("aria-expanded", v ? "true" : "false");
     }
 
     function select(i) {
       if (i < 0 || i >= n || i === cur) return false;
+      // 滚轮或键盘操作后，下一次点击沿着刚才的方向继续；在两端折返。
+      clickDirection = i > cur ? 1 : -1;
       cur = i;
+      if (cur === 0) clickDirection = 1;
+      else if (cur === n - 1) clickDirection = -1;
       render();
-      if (fitSwap) window.setTimeout(fitSwap, 320);   // 描述容器高度跟着当前那一段
       return true;
+    }
+
+    function advanceName() {
+      // 一个名字时保持不变；以后加到 4、5… 个名字也不需要改这里。
+      if (n < 2) return;
+      if (cur === 0) clickDirection = 1;
+      else if (cur === n - 1) clickDirection = -1;
+      select(cur + clickDirection);
     }
 
     function markChosen() {
@@ -479,25 +537,23 @@
 
     try { if (grid && sessionStorage.getItem(CHOSEN) === "1") grid.classList.add("is-chosen"); } catch (e) {}
 
-    /* ---- 让描述容器的高度跟随当前显示的那一段（方案 B 专用）---- */
+    /* ---- 介绍高度跟随当前选中项，多名字版与旧的两段介绍共用 ---- */
     var fitSwap = null;
-    var swap = $(".about-swap");
     if (swap) {
-      var kids = Array.prototype.filter.call(swap.children, function (nd) { return nd.nodeType === 1; });
       var altIdx = -1;
-      kids.forEach(function (nd, i) {
+      descriptions.forEach(function (nd, i) {
         if (nd.classList && nd.classList.contains("about-swap-alt")) altIdx = i;
       });
-      if (altIdx > 0) {
+      if ((multi && descriptions.length) || altIdx > 0) {
         swap.style.overflow = "hidden";
-        swap.style.transition = "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)";
+        swap.style.transition = reduced ? "none" : "height 0.42s cubic-bezier(0.22, 1, 0.36, 1)";
         fitSwap = function () {
-          var el = kids[alias.classList.contains("is-alt") ? altIdx : 0];
+          var idx = multi ? Math.min(cur, descriptions.length - 1) : (cur > 0 ? altIdx : 0);
+          var el = descriptions[idx];
           if (!el) return;
           var mb = parseFloat(window.getComputedStyle(el).marginBottom) || 0;
           swap.style.height = Math.round(el.getBoundingClientRect().height + mb) + "px";
         };
-        fitSwap();
         window.addEventListener("resize", fitSwap);
         if (doc.fonts && doc.fonts.ready && doc.fonts.ready.then) {
           doc.fonts.ready.then(function () { fitSwap(); }).catch(function () {});
@@ -507,6 +563,7 @@
 
     measureNames();
     render();
+    setOpen(false);
 
     /* 字体加载完成 / 窗口尺寸变化后，名字宽度可能变，重新量一遍 */
     window.addEventListener("resize", function () { measureNames(); fitName(); });
@@ -536,27 +593,32 @@
     /* ---- 滚轮切换名字 ---- */
     alias.addEventListener("wheel", function (e) {
       if (coarse || !open) return;
+      if (!e.deltaY) return;
       var dir = e.deltaY > 0 ? 1 : -1;
       // 已经滚到列表两端就放行，让页面正常滚动，别把用户"卡"在这里
       if (!select(cur + dir)) return;
       e.preventDefault();
     }, { passive: false });
 
-    /* ---- 移动端：点一下切到下一个（循环） ---- */
+    /* ---- 鼠标单击 / 手指轻点：向前到末尾，再向后回到开头，重复往返 ---- */
     alias.addEventListener("click", function (e) {
-      if (!coarse) return;
       e.preventDefault();
-      select((cur + 1) % n);
+      advanceName();
       setOpen(true);
       markChosen();
       clearTimeout(timer);
-      timer = setTimeout(function () { setOpen(false); }, 2200);
+      if (coarse) timer = setTimeout(function () { setOpen(false); }, 2200);
     });
 
     /* ---- 键盘 ---- */
     alias.addEventListener("keydown", function (e) {
       var k = e.key;
-      if (k === "ArrowDown" || k === "ArrowRight" || k === "Enter" || k === " ") {
+      if (k === "Enter" || k === " ") {
+        e.preventDefault();
+        setOpen(true);
+        markChosen();
+        advanceName();
+      } else if (k === "ArrowDown" || k === "ArrowRight") {
         e.preventDefault();
         setOpen(true);
         markChosen();
@@ -661,6 +723,7 @@
 
     var posts = null;
     var loading = false;
+    var pendingIndex = [];
     var panel = null, input = null, list = null;
     var items = [], active = 0, lastFocus = null;
 
@@ -668,12 +731,22 @@
     function loadIndex(cb) {
       if (posts) { cb(); return; }
       if (window.__SEARCH_INDEX__) { posts = window.__SEARCH_INDEX__; cb(); return; }
+      pendingIndex.push(cb);
       if (loading) return;
       loading = true;
       var s = doc.createElement("script");
       s.src = PREFIX + "js/search-index.js";
-      s.onload = function () { posts = window.__SEARCH_INDEX__ || []; loading = false; cb(); };
-      s.onerror = function () { posts = []; loading = false; cb(); };
+      function finish(ok) {
+        // null 表示尚未成功加载，下次打开搜索时可以重试；[] 则是有效的空索引。
+        posts = ok && Array.isArray(window.__SEARCH_INDEX__) ? window.__SEARCH_INDEX__ : null;
+        loading = false;
+        s.remove();
+        var callbacks = pendingIndex;
+        pendingIndex = [];
+        callbacks.forEach(function (callback) { callback(); });
+      }
+      s.onload = function () { finish(true); };
+      s.onerror = function () { finish(false); };
       doc.head.appendChild(s);
     }
 
@@ -790,7 +863,11 @@
       list = $(".cmdk-results", panel);
 
       render("");
-      loadIndex(function () { render(input.value); });
+      var openedPanel = panel;
+      loadIndex(function () {
+        // 面板可能已关闭或重新打开，过期请求不能再操作旧搜索框。
+        if (panel === openedPanel && input) render(input.value);
+      });
       input.focus();
 
       input.addEventListener("input", function () { render(input.value); });

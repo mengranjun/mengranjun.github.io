@@ -47,7 +47,7 @@ tools/
 内置工具如果想沿用博客的 Paper & Ink 风格，可以直接引用站点样式：
 
 ```html
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../../css/style.css">
 ```
 
 并复用 CSS 变量（`--accent`、`--surface`、`--text`、`--bg` 等），这样深浅色主题自动跟随。不想沿用也完全没问题——每个子目录是独立的小页面，自由发挥。

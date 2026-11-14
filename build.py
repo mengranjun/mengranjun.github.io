@@ -6,27 +6,46 @@ MurojBlog 构建脚本（零第三方依赖，只用 Python 标准库）
 用法
 ----
     python build.py                  # 构建：Markdown → HTML，并刷新首页/归档/站点地图/订阅
+    python build.py check            # 只检查，不修改文件；发现错误时返回失败状态
+    python build.py preview          # 构建到内存并打开本地预览，修改内容后自动刷新
     python build.py new "文章标题"    # 新建一篇文章的 Markdown 草稿
     python build.py list             # 列出所有文章
     python build.py url <网址>        # 一次性改好全站网址（推荐部署前先跑这条）
 
 你只需要在 posts/ 目录里写 .md 文件，其余全部自动生成。
 """
+# 26/11/12: GPT 6.1 Sol 更新
 
 from __future__ import annotations
 
 import datetime as dt
+import argparse
 import hashlib
 import html
 import json
 import math
+import os
 import re
+import shutil
 import sys
+import tempfile
+import threading
 import unicodedata
+import webbrowser
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
+from collections import Counter
+from html.parser import HTMLParser
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent
 POSTS_DIR = ROOT / "posts"
+
+
+class BuildError(ValueError):
+    """可以直接告诉作者如何纠正的构建错误。"""
 
 
 def _force_utf8_console() -> None:
@@ -59,6 +78,7 @@ SITE = {
     "author": "孟然君",
     "lang": "zh-CN",
     "url": "https://mengranjun.github.io",   # ←← 用 python build.py url <地址> 自动修改
+    "repo_url": "https://github.com/mengranjun/mengranjun.github.io",
     "latest": 3,                          # 首页「最新文章」显示几篇
 }
 
@@ -117,6 +137,8 @@ def _join_soft(lines: list[str]) -> str:
     """把折行的段落合并成一行。中英文之间才补空格，避免中文里被塞进多余空格。"""
     out = ""
     for ln in lines:
+        if not ln:
+            continue
         if not out:
             out = ln
         elif CJK_RE.match(out[-1]) or CJK_RE.match(ln[0]) or ln[0] in CJK_PUNCT:
@@ -126,33 +148,88 @@ def _join_soft(lines: list[str]) -> str:
     return out
 
 
+def _replace_links(text: str, render) -> str:
+    """识别链接目标里成对的括号，不把网址中的第一个右括号当成结尾。"""
+    out, i = [], 0
+    while i < len(text):
+        start = i
+        image = text.startswith("![", i)
+        if (text[i] != "[" and not image) or (i and text[i - 1] == "\\"):
+            out.append(text[i])
+            i += 1
+            continue
+        label_start = i + (2 if image else 1)
+        j, depth = label_start, 1
+        while j < len(text) and depth:
+            if text[j] == "\\" and j + 1 < len(text):
+                j += 2
+                continue
+            if text[j] == "[":
+                depth += 1
+            elif text[j] == "]":
+                depth -= 1
+            if depth:
+                j += 1
+        if depth or text[j:j + 2] != "](":
+            out.append(text[start])
+            i += 1
+            continue
+        k, depth = j + 2, 1
+        while k < len(text) and depth:
+            if text[k] == "\\" and k + 1 < len(text):
+                k += 2
+                continue
+            if text[k].isspace():
+                break
+            if text[k] == "(":
+                depth += 1
+            elif text[k] == ")":
+                depth -= 1
+            if depth:
+                k += 1
+        if depth:
+            out.append(text[start])
+            i += 1
+            continue
+        url = re.sub(r"\\([()\\])", r"\1", text[j + 2:k])
+        out.append(render(image, text[label_start:j], url))
+        i = k + 1
+    return "".join(out)
+
+
+def _emphasis(text: str) -> str:
+    text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
+    text = re.sub(r"~~([^~]+)~~", r"<del>\1</del>", text)
+    return re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<em>\1</em>", text)
+
+
 def inline(text: str) -> str:
     """行内语法：`code`、**粗体**、*斜体*、~~删除线~~、[链接](url)、![图片](src)"""
     codes: list[str] = []
 
     def stash_code(m):
-        codes.append(m.group(1))
+        codes.append(m.group(2))
         return "\x02%d\x02" % (len(codes) - 1)
 
-    text = re.sub(r"`([^`]+)`", stash_code, text)
+    text = re.sub(r"(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)", stash_code, text)
     text = _escape_keep_tags(text)
 
     # 注意：到这里正文已经过 html.escape(quote=False)，所以只需要处理 `"`，
     # 不能再整体 escape 一次（会把 &amp; 变成 &amp;amp;）。
-    def _img(m):
-        alt = m.group(1).replace('"', '&quot;')      # 防止 alt 里的引号撑破属性
-        src = m.group(2).replace('"', '%22')
-        return '<img src="%s" alt="%s" loading="lazy">' % (src, alt)
+    links: list[str] = []
 
-    def _link(m):
-        href = m.group(2).replace('"', '%22')        # 防止 href 里的引号撑破属性
-        return '<a href="%s">%s</a>' % (href, m.group(1))
+    def keep_link(image: bool, label: str, url: str) -> str:
+        url = url.replace('"', '%22')
+        if image:
+            label = re.sub(r"\x02(\d+)\x02", lambda m: html.escape(codes[int(m[1])]), label)
+            rendered = '<img src="%s" alt="%s" loading="lazy">' % (url, label.replace('"', '&quot;'))
+        else:
+            rendered = '<a href="%s">%s</a>' % (url, _emphasis(label))
+        links.append(rendered)
+        return "\x03%d\x03" % (len(links) - 1)
 
-    text = re.sub(r"!\[([^\]]*)\]\(([^)\s]+)\)", _img, text)
-    text = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", _link, text)
-    text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
-    text = re.sub(r"~~([^~]+)~~", r"<del>\1</del>", text)
-    text = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<em>\1</em>", text)
+    text = _emphasis(_replace_links(text, keep_link))
+    text = re.sub(r"\x03(\d+)\x03", lambda m: links[int(m[1])], text)
 
     def unstash(m):
         return "<code>" + html.escape(codes[int(m.group(1))], quote=False) + "</code>"
@@ -162,11 +239,33 @@ def inline(text: str) -> str:
 
 def _split_row(line: str) -> list[str]:
     line = line.strip()
+    cells, buf, ticks, i = [], [], 0, 0
+    while i < len(line):
+        if line[i:i + 2] == "\\|":
+            buf.append("|")
+            i += 2
+            continue
+        if line[i] == "`":
+            end = i + 1
+            while end < len(line) and line[end] == "`":
+                end += 1
+            run = end - i
+            ticks = 0 if ticks == run else (run if not ticks else ticks)
+            buf.append(line[i:end])
+            i = end
+            continue
+        if line[i] == "|" and not ticks:
+            cells.append("".join(buf).strip())
+            buf = []
+        else:
+            buf.append(line[i])
+        i += 1
+    cells.append("".join(buf).strip())
     if line.startswith("|"):
-        line = line[1:]
-    if line.endswith("|"):
-        line = line[:-1]
-    return [c.strip() for c in line.split("|")]
+        cells.pop(0)
+    if len(cells) > 1 and not cells[-1] and line.endswith("|"):
+        cells.pop()
+    return cells
 
 
 def _is_table_sep(line: str) -> bool:
@@ -206,6 +305,13 @@ def _render_list(lines: list[str], i: int) -> tuple[str, int]:
     while i < len(lines):
         raw = lines[i]
         if not raw.strip():
+            nxt = i + 1
+            while nxt < len(lines) and not lines[nxt].strip():
+                nxt += 1
+            if nxt < len(lines) and re.match(r"^(\s*)([-*+]|\d+[.)])\s+", lines[nxt]):
+                if len(lines[nxt]) - len(lines[nxt].lstrip()) >= base_indent:
+                    i = nxt
+                    continue
             break
         m = re.match(r"^(\s*)([-*+]|\d+[.)])\s+(.*)$", raw)
         if not m:
@@ -334,9 +440,9 @@ def md_to_html(src: str, headings: list | None = None) -> str:
         if s.startswith(">"):
             buf = []
             while i < n and lines[i].strip().startswith(">"):
-                buf.append(re.sub(r"^\s*>\s?", "", lines[i]).strip())
+                buf.append(re.sub(r"^\s*>\s?", "", lines[i]))
                 i += 1
-            out.append("<blockquote>\n  <p>%s</p>\n</blockquote>" % inline(_join_soft(buf)))
+            out.append("<blockquote>\n%s\n</blockquote>" % md_to_html("\n".join(buf)))
             continue
 
         # ---- 列表 ----
@@ -485,18 +591,21 @@ def render_code_block(raw: str, lang: str) -> str:
 
 def parse_front_matter(text: str) -> tuple[dict, str]:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    if not text.startswith("---"):
+    if not re.match(r"^---[ \t]*\n", text):
         return {}, text
     m = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", text, re.S)
     if not m:
-        return {}, text
+        raise BuildError("文章开头的元信息缺少结束分隔线 ---")
     meta: dict = {}
     for raw in m.group(1).split("\n"):
         line = raw.strip()
         if not line or line.startswith("#") or ":" not in line:
             continue
         key, _, val = line.partition(":")
-        meta[key.strip().lower()] = val.strip()
+        val = val.strip()
+        if len(val) >= 2 and val[0] in "\"'" and val[-1] == val[0]:
+            val = val[1:-1]
+        meta[key.strip().lower()] = val
     return meta, m.group(2)
 
 
@@ -524,22 +633,44 @@ def slugify(name: str) -> str:
     return re.sub(r"-{2,}", "-", name).strip("-") or "post"
 
 
+def validate_slug(slug: str) -> None:
+    """同时符合站内 URL 和 Windows 文件名规则，不允许跳出 posts/。"""
+    reserved = {"con", "prn", "aux", "nul"} | {"%s%d" % (p, n) for p in ("com", "lpt") for n in range(1, 10)}
+    if (not re.fullmatch(r"[\w-]+(?:\.[\w-]+)*", slug)
+            or slug.split(".")[0].casefold() in reserved or len(slug) > 120):
+        raise BuildError("slug %r 不适合作为文件名；请使用中文、字母、数字、连字符或下划线，不能包含路径" % slug)
+
+
 def load_posts() -> list[dict]:
     posts = []
+    seen_slugs: dict[str, str] = {}
     for f in sorted(POSTS_DIR.glob("*.md")):
         # utf-8-sig：Windows 编辑器常给文件加 BOM，不去掉的话 front matter 会整段失效
-        meta, body = parse_front_matter(f.read_text(encoding="utf-8-sig"))
+        try:
+            meta, body = parse_front_matter(f.read_text(encoding="utf-8-sig"))
+        except BuildError as exc:
+            raise BuildError("%s：%s" % (f.name, exc)) from exc
         title = meta.get("title") or f.stem
         date = meta.get("date") or dt.date.fromtimestamp(f.stat().st_mtime).isoformat()
-        sort_date = _parse_date(date)
-        if meta.get("date") and sort_date == dt.date(1970, 1, 1):
-            print("  ! %s 的日期 %r 无法识别，已按最旧日期排到最后" % (f.name, date))
+        try:
+            sort_date = _parse_date(date)
+            slug = meta.get("slug") or f.stem
+            validate_slug(slug)
+            minutes = meta.get("minutes", "")
+            if minutes and (not re.fullmatch(r"[0-9]+", minutes) or int(minutes) < 1):
+                raise BuildError("minutes 必须是大于 0 的整数")
+        except ValueError as exc:
+            raise BuildError("%s：%s" % (f.name, exc)) from exc
+        key = unicodedata.normalize("NFKC", slug).casefold()
+        if key in seen_slugs:
+            raise BuildError("%s 与 %s 使用了相同的文章网址 %r（不区分大小写）" % (f.name, seen_slugs[key], slug))
+        seen_slugs[key] = f.name
         tags = [t.strip() for t in re.split(r"[,，]", meta.get("tags", "")) if t.strip()]
         posts.append({
-            "slug": meta.get("slug") or f.stem,
+            "slug": slug,
             "file": f,
             "title": title,
-            "date": date,
+            "date": sort_date.isoformat(),
             "sort": sort_date,
             "tags": tags,
             "pin": str(meta.get("pin", "")).strip().lower() in ("true", "yes", "1", "on", "是"),
@@ -547,19 +678,17 @@ def load_posts() -> list[dict]:
             # type: video 的文章正文只有一段视频，卡片上就不显示「约 N 分钟读完」
             "kind": (meta.get("type") or "post").strip().lower(),
             "ai": str(meta.get("ai", "true")).strip().lower() not in ("false", "no", "0", "否"),
-            "minutes": int(meta["minutes"]) if meta.get("minutes", "").isdigit()
-                       else reading_minutes(body),
+            "minutes": int(minutes) if minutes else reading_minutes(body),
             "words": word_count(body),
             "body_md": body,
         })
 
-    # 归并 slug 相同的标签（比如同时写了 "AI" 和 "ai"），
-    # 否则两个标签会生成同一个 tags/xxx.html 互相覆盖
+    # 只归并大小写不同的同名标签，C++ / C# 等有实际区别的标签必须保留。
     canon: dict[str, str] = {}
     for p in posts:
         merged = []
         for t in p["tags"]:
-            s = tag_slug(t)
+            s = unicodedata.normalize("NFKC", t).casefold()
             if s in canon:
                 t = canon[s]
             else:
@@ -579,7 +708,7 @@ def _parse_date(s: str) -> dt.date:
             return dt.datetime.strptime(s, fmt).date()
         except ValueError:
             continue
-    return dt.date(1970, 1, 1)
+    raise BuildError("日期 %r 无法识别；请使用 YYYY-MM-DD，例如 2026-11-12" % s)
 
 
 # ==========================================================================
@@ -657,12 +786,12 @@ def head_block(title: str, description: str, prefix: str, url_path: str,
     )
 
 
-def header_block(prefix: str, active: str) -> str:
+def header_block(prefix: str, active: str, include_progress: bool = True) -> str:
     def cls(name):
         return ' class="active"' if name == active else ""
 
     return (
-        '<div class="progress-bar"></div>\n'
+        ('<div class="progress-bar"></div>\n' if include_progress else "") +
         '  <header class="site-header">\n'
         '    <div class="header-inner">\n'
         '      <a class="logo" href="%sindex.html">%s%s</a>\n'
@@ -697,21 +826,22 @@ def header_block(prefix: str, active: str) -> str:
     )
 
 
-def footer_block(prefix: str) -> str:
+def footer_block(prefix: str, note: str = "") -> str:
     return (
         '<footer class="site-footer">\n'
         '    <div class="footer-inner">\n'
-        '      <span>© <span data-year>%d</span> %s · Powered by GitHub Pages</span>\n'
+        '      <span>© <span data-year>%d</span> %s · Powered by GitHub Pages%s</span>\n'
         '      <div class="footer-links">\n'
         '        <a href="%sarchive.html">归档</a>\n'
         '        <a href="%sabout.html">关于</a>\n'
         '        <a href="%stools.html">小工具</a>\n'
         '        <a href="%sfeed.xml">RSS</a>\n'
-        '        <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>\n'
+        '        <a href="%s" target="_blank" rel="noopener noreferrer">GitHub</a>\n'
         "      </div>\n"
         "    </div>\n"
         "  </footer>"
-        % (dt.date.today().year, SITE["name"], prefix, prefix, prefix, prefix)
+        % (dt.date.today().year, SITE["name"], html.escape(note),
+           prefix, prefix, prefix, prefix, html.escape(SITE["repo_url"], quote=True))
     )
 
 
@@ -828,30 +958,136 @@ def render_post(p: dict, newer: dict | None, older: dict | None) -> str:
 # 4. 注入静态页面的 BUILD 区块
 # ==========================================================================
 
-def inject(path: Path, name: str, content: str, indent: str = "          ") -> bool:
-    text = path.read_text(encoding="utf-8")
+@dataclass
+class BuildPlan:
+    """先完整生成到内存；所有转换成功后，才替换正式文件。"""
+    files: dict[Path, str] = field(default_factory=dict)
+    deletes: set[Path] = field(default_factory=set)
+
+    def read(self, path: Path) -> str:
+        return self.files[path] if path in self.files else path.read_text(encoding="utf-8")
+
+    def write(self, path: Path, text: str) -> None:
+        if not path.resolve().is_relative_to(ROOT.resolve()):
+            raise BuildError("输出位置超出项目目录：%s" % path)
+        self.files[path] = text
+
+    def changes(self) -> list[Path]:
+        return [p for p, text in self.files.items()
+                if not p.exists() or p.read_bytes() != text.encode("utf-8")]
+
+    def commit(self) -> tuple[int, int]:
+        changed = self.changes()
+        deleted = sorted(p for p in self.deletes if p.exists())
+        if not changed and not deleted:
+            return 0, 0
+        stage = Path(tempfile.mkdtemp(prefix=".muroj-build-", dir=ROOT))
+        backups: dict[Path, Path] = {}
+        staged: dict[Path, Path] = {}
+        applied: list[Path] = []
+        created_dirs: list[Path] = []
+        cleanup = True
+        try:
+            # 准备全部新文件与原件备份；此阶段不修改正式页面。
+            for i, path in enumerate(changed + deleted):
+                if not path.resolve().is_relative_to(ROOT.resolve()):
+                    raise BuildError("拒绝修改项目外的文件：%s" % path)
+                if path.exists():
+                    backup = stage / ("old-%d" % i)
+                    shutil.copy2(path, backup)
+                    backups[path] = backup
+                if path in self.files:
+                    new = stage / ("new-%d" % i)
+                    new.write_text(self.files[path], encoding="utf-8", newline="\n")
+                    staged[path] = new
+            for path in changed:
+                if not path.parent.exists():
+                    path.parent.mkdir(parents=True)
+                    created_dirs.append(path.parent)
+                os.replace(staged[path], path)
+                applied.append(path)
+            for path in deleted:
+                path.unlink()
+                applied.append(path)
+        except BaseException as exc:
+            failures = []
+            for path in reversed(applied):
+                try:
+                    if path in backups:
+                        os.replace(backups[path], path)
+                    else:
+                        path.unlink(missing_ok=True)
+                except OSError as restore_error:
+                    failures.append(str(restore_error))
+            for directory in reversed(created_dirs):
+                try:
+                    directory.rmdir()
+                except OSError:
+                    pass
+            if failures:
+                cleanup = False
+                raise BuildError("写入失败且未能完整恢复；原件备份保存在 %s：%s" % (stage, "; ".join(failures))) from exc
+            if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+                raise
+            raise BuildError("写入失败，已恢复原文件：%s" % exc) from exc
+        finally:
+            if cleanup:
+                shutil.rmtree(stage)
+        return len(changed), len(deleted)
+
+
+def inject(path: Path, name: str, content: str, indent: str = "          ",
+           plan: BuildPlan | None = None) -> bool:
+    text = plan.read(path) if plan else path.read_text(encoding="utf-8")
     start, end = BUILD_START.format(name), BUILD_END.format(name)
-    if start not in text or end not in text:
-        print("  ! %s 缺少 %s 标记，已跳过" % (path.name, name))
-        return False
+    if text.count(start) != 1 or text.count(end) != 1 or text.index(start) >= text.index(end):
+        raise BuildError("%s 的 BUILD:%s 标记缺失、重复或顺序错误；请保留一对 START / END 标记" % (path.name, name))
     body = "\n".join(indent + ln if ln.strip() else "" for ln in content.split("\n"))
-    new = re.sub(
-        re.escape(start) + r".*?" + re.escape(end),
-        start + "\n" + body + "\n" + indent + end,
-        text, flags=re.S,
-    )
-    path.write_text(new, encoding="utf-8", newline="\n")
+    # 文本直接拼接，反斜杠等文章内容不会被当成正则替换指令。
+    new = (text[:text.index(start)] + start + "\n" + body + "\n" + indent + end
+           + text[text.index(end) + len(end):])
+    if plan:
+        plan.write(path, new)
+    else:
+        path.write_text(new, encoding="utf-8", newline="\n")
     return True
 
 
-def build_search_index(posts: list[dict]) -> None:
+class _VisibleText(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.skip: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        classes = dict(attrs).get("class", "").split()
+        if self.skip or tag in ("script", "style") or "cl-n" in classes or "copy-btn" in classes:
+            if tag not in ("img", "br", "hr", "input", "source", "wbr"):
+                self.skip.append(tag)
+        elif tag in ("p", "div", "li", "pre", "br", "tr", "td", "th", "h2", "h3", "h4", "h5", "h6"):
+            self.parts.append("\n")
+        elif tag == "img":
+            self.parts.append(dict(attrs).get("alt", ""))
+
+    def handle_endtag(self, tag):
+        if self.skip:
+            if tag == self.skip[-1]:
+                self.skip.pop()
+        elif tag in ("p", "div", "li", "pre", "tr", "td", "th", "h2", "h3", "h4", "h5", "h6"):
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.parts.append(data)
+
+
+def build_search_index(posts: list[dict], plan: BuildPlan | None = None) -> None:
     """生成 js/search-index.js（用 JS 文件而不是 JSON，这样 file:// 直接打开也能搜索）。"""
     items = []
     for p in posts:
-        plain = re.sub(r"```.*?```", " ", p["body_md"], flags=re.S)
-        plain = re.sub(r"<[^>]*>", " ", plain)        # 标签和属性不算正文
-        plain = re.sub(r"[#>*`\[\]()!|~-]", " ", plain)
-        plain = re.sub(r"\s+", " ", plain).strip()[:1500]
+        extractor = _VisibleText()
+        extractor.feed(md_to_html(p["body_md"]))
+        plain = re.sub(r"\s+", " ", "".join(extractor.parts)).strip()
         items.append({
             "t": p["title"],
             "u": "posts/%s.html" % p["slug"],
@@ -866,11 +1102,19 @@ def build_search_index(posts: list[dict]) -> None:
           "window.__SEARCH_INDEX__ = "
           + json.dumps(items, ensure_ascii=False, separators=(",", ":"))
           + ";\n")
-    (ROOT / "js" / "search-index.js").write_text(js, encoding="utf-8", newline="\n")
+    path = ROOT / "js" / "search-index.js"
+    if plan:
+        plan.write(path, js)
+    else:
+        path.write_text(js, encoding="utf-8", newline="\n")
 
 
 def tag_slug(tag: str) -> str:
-    return _heading_id(tag) or "tag"
+    normal = unicodedata.normalize("NFKC", tag).strip().casefold()
+    base = _heading_id(normal) or "tag"
+    if normal != base or base == "index" or len(base) > 80:
+        return base[:80] + "--" + hashlib.sha256(normal.encode("utf-8")).hexdigest()[:12]
+    return base
 
 
 def collect_tags(posts: list[dict]) -> list[str]:
@@ -968,24 +1212,22 @@ def render_tags_index(tags: list, posts: list) -> str:
     )
 
 
-def build_tag_pages(posts: list[dict]) -> list[str]:
+def build_tag_pages(posts: list[dict], plan: BuildPlan | None = None) -> list[str]:
     tags = collect_tags(posts)
-    if not tags:
-        return []
+    own_plan = plan is None
+    plan = plan if plan is not None else BuildPlan()
     out_dir = ROOT / "tags"
-    out_dir.mkdir(exist_ok=True)
     for t in tags:
         tagged = [p for p in posts if t in p["tags"]]
-        (out_dir / ("%s.html" % tag_slug(t))).write_text(
-            render_tag_page(t, tagged, tags), encoding="utf-8", newline="\n")
-    (out_dir / "index.html").write_text(
-        render_tags_index(tags, posts), encoding="utf-8", newline="\n")
+        plan.write(out_dir / ("%s.html" % tag_slug(t)), render_tag_page(t, tagged, tags))
+    plan.write(out_dir / "index.html", render_tags_index(tags, posts))
     # 标签改名/删除后，旧标签页同样要清掉
     keep = {"%s.html" % tag_slug(t) for t in tags} | {"index.html"}
     for old in out_dir.glob("*.html"):
         if old.name not in keep:
-            old.unlink()
-            print("  清理过期标签页：tags/%s" % old.name)
+            plan.deletes.add(old)
+    if own_plan:
+        plan.commit()
     return tags
 
 
@@ -1038,7 +1280,7 @@ def build_heatmap(posts: list[dict]) -> str:
     )
 
 
-def build_sitemap(posts: list[dict]) -> None:
+def build_sitemap(posts: list[dict], plan: BuildPlan | None = None) -> None:
     base = SITE["url"].rstrip("/")
     urls = [("", "1.0"), ("archive.html", "0.6"), ("about.html", "0.5"), ("tools.html", "0.5")]
     urls += [("posts/%s.html" % p["slug"], "0.8") for p in posts]
@@ -1053,14 +1295,18 @@ def build_sitemap(posts: list[dict]) -> None:
             # 用解析后的日期而不是 front matter 原文，保证输出一定是 YYYY-MM-DD
             lastmod = "\n    <lastmod>%s</lastmod>" % match["sort"].isoformat() if match else ""
         items.append("  <url>\n    <loc>%s</loc>%s\n    <priority>%s</priority>\n  </url>"
-                     % (loc, lastmod, pri))
+                     % (html.escape(loc, quote=False), lastmod, pri))
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
            + "\n".join(items) + "\n</urlset>\n")
-    (ROOT / "sitemap.xml").write_text(xml, encoding="utf-8", newline="\n")
+    path = ROOT / "sitemap.xml"
+    if plan:
+        plan.write(path, xml)
+    else:
+        path.write_text(xml, encoding="utf-8", newline="\n")
 
 
-def build_feed(posts: list[dict]) -> None:
+def build_feed(posts: list[dict], plan: BuildPlan | None = None) -> None:
     base = SITE["url"].rstrip("/")
     updated = max((p["sort"] for p in posts), default=dt.date.today())
     items = []
@@ -1074,7 +1320,7 @@ def build_feed(posts: list[dict]) -> None:
             "      <pubDate>%s</pubDate>\n"
             "      <description>%s</description>\n"
             "    </item>"
-            % (html.escape(p["title"]), link, link,
+            % (html.escape(p["title"]), html.escape(link, quote=False), html.escape(link, quote=False),
                p["sort"].strftime("%a, %d %b %Y 00:00:00 +0800"),
                html.escape(p["summary"]))
         )
@@ -1090,71 +1336,313 @@ def build_feed(posts: list[dict]) -> None:
            "%s\n"
            "  </channel>\n"
            "</rss>\n"
-           % (html.escape(SITE["name"]), base, html.escape(SITE["description"]), SITE["lang"],
-              base, updated.strftime("%a, %d %b %Y 00:00:00 +0800"), "\n".join(items)))
-    (ROOT / "feed.xml").write_text(xml, encoding="utf-8", newline="\n")
+           % (html.escape(SITE["name"]), html.escape(base, quote=False), html.escape(SITE["description"]), SITE["lang"],
+               html.escape(base, quote=True), updated.strftime("%a, %d %b %Y 00:00:00 +0800"), "\n".join(items)))
+    path = ROOT / "feed.xml"
+    if plan:
+        plan.write(path, xml)
+    else:
+        path.write_text(xml, encoding="utf-8", newline="\n")
 
 
 # ==========================================================================
 # 5. 命令
 # ==========================================================================
 
-def cmd_build() -> int:
+def make_build_plan(plan: BuildPlan | None = None) -> tuple[BuildPlan, list[dict]]:
+    plan = plan if plan is not None else BuildPlan()
     posts = load_posts()
     if not posts:
-        print("posts/ 下没有 .md 文件。先运行：python build.py new \"我的第一篇文章\"")
-        return 1
+        raise BuildError("posts/ 下没有 .md 文件。先运行：python build.py new \"我的第一篇文章\"")
 
-    print("读取到 %d 篇文章：" % len(posts))
-    for p in posts:
-        print("  · %s  %-34s %s" % (p["date"], p["title"], "AI" if p["ai"] else "  "))
+    # 常规页面的共享页头 / 页脚集中维护在 header_block / footer_block。
+    # 404 页使用独立布局，不参与这组模板。
+    for page, active in (("index.html", "home"), ("about.html", "about"),
+                         ("archive.html", "archive"), ("tools.html", "tools")):
+        path = ROOT / page
+        inject(path, "HEADER", header_block("", active, include_progress=False), "", plan)
+        note = " · 26.10.07.19.50--4+1+7" if page == "index.html" else ""
+        inject(path, "FOOTER", footer_block("", note=note), "", plan)
 
     # 文章页
     for idx, p in enumerate(posts):
         newer = posts[idx - 1] if idx > 0 else None
         older = posts[idx + 1] if idx + 1 < len(posts) else None
         out = POSTS_DIR / ("%s.html" % p["slug"])
-        out.write_text(render_post(p, newer, older), encoding="utf-8", newline="\n")
-    print("生成 %d 个文章页" % len(posts))
+        try:
+            plan.write(out, render_post(p, newer, older))
+        except (ValueError, IndexError, re.error) as exc:
+            raise BuildError("%s 渲染失败：%s" % (p["file"].name, exc)) from exc
 
     # 清理「幽灵页面」：.md 删除/改名后，旧 HTML 不能留在站里继续被发布
     live = {"%s.html" % p["slug"] for p in posts}
     for old in POSTS_DIR.glob("*.html"):
         if old.name not in live:
-            old.unlink()
-            print("  清理过期文章页：posts/%s" % old.name)
+            plan.deletes.add(old)
 
     # 首页卡片
     latest = posts[: SITE["latest"]]
     inject(ROOT / "index.html", "POSTS",
-           "\n\n".join(render_card(p) for p in latest), "          ")
+           "\n\n".join(render_card(p) for p in latest), "          ", plan)
 
     # 归档
     inject(ROOT / "archive.html", "ARCHIVE",
-           "\n".join(render_archive_item(p) for p in posts), "        ")
+           "\n".join(render_archive_item(p) for p in posts), "        ", plan)
     tags = collect_tags(posts)
     filters = ['<button class="filter-btn active" data-tag="all" aria-pressed="true">全部</button>']
     filters += ['<button class="filter-btn" data-tag="%s" aria-pressed="false">%s</button>'
                 % (html.escape(t), html.escape(t)) for t in tags]
-    inject(ROOT / "archive.html", "FILTERS", "\n".join(filters), "        ")
+    inject(ROOT / "archive.html", "FILTERS", "\n".join(filters), "        ", plan)
     inject(ROOT / "archive.html", "COUNT",
-           "<span>共 %d 篇 · 按时间倒序</span>" % len(posts), "          ")
-    inject(ROOT / "archive.html", "HEATMAP", build_heatmap(posts), "        ")
+           "<span>共 %d 篇 · 按时间倒序</span>" % len(posts), "          ", plan)
+    inject(ROOT / "archive.html", "HEATMAP", build_heatmap(posts), "        ", plan)
 
-    build_tag_pages(posts)
-    print("生成 %d 个标签页 + 标签总览页" % len(tags))
+    build_tag_pages(posts, plan)
+    build_sitemap(posts, plan)
+    build_feed(posts, plan)
+    build_search_index(posts, plan)
+    return plan, posts
 
-    build_sitemap(posts)
-    build_feed(posts)
-    build_search_index(posts)
-    print("生成 sitemap.xml、feed.xml、js/search-index.js")
-    print("\n完成。本地预览：python -m http.server 8080")
+
+def cmd_build() -> int:
+    plan, posts = make_build_plan()
+    written, removed = plan.commit()
+    print("完成：%d 篇文章、%d 个标签；更新 %d 个文件，清理 %d 个旧页面。" %
+          (len(posts), len(collect_tags(posts)), written, removed))
+    for path in sorted(plan.deletes):
+        print("  清理过期页面：%s" % path.relative_to(ROOT).as_posix())
+    print("检查：python build.py check\n本地预览：python build.py preview")
+    return 0
+
+
+class _PageReferences(HTMLParser):
+    def __init__(self, text: str):
+        super().__init__(convert_charrefs=True)
+        self.ids: list[str] = []
+        self.refs: list[str] = []
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if values.get("id"):
+            self.ids.append(values["id"])
+        elif tag == "a" and values.get("name"):
+            self.ids.append(values["name"])
+        for key in ("href", "src", "poster"):
+            if values.get(key):
+                self.refs.append(values[key])
+
+
+def check_site(plan: BuildPlan, include_stale: bool = True) -> list[str]:
+    """检查即将生成的站点，连同磁盘上的资源；不访问外部网站、不写文件。"""
+    errors: list[str] = []
+    for name in ("feed.xml", "sitemap.xml"):
+        try:
+            ET.fromstring(plan.read(ROOT / name))
+        except (ET.ParseError, OSError) as exc:
+            errors.append("%s 格式不正确或无法读取：%s" % (name, exc))
+    if include_stale:
+        changed = plan.changes()
+        if changed or plan.deletes:
+            errors.append("生成结果尚未同步，请运行 python build.py：%s" % ", ".join(
+                p.relative_to(ROOT).as_posix() for p in sorted(set(changed) | plan.deletes)))
+    paths = {ROOT / name for name in ("index.html", "archive.html", "about.html", "tools.html", "404.html")}
+    for directory in ("posts", "tags", "tools"):
+        paths.update((ROOT / directory).rglob("*.html"))
+    paths.update(p for p in plan.files if p.suffix == ".html")
+    paths.difference_update(plan.deletes)
+    pages: dict[Path, _PageReferences] = {}
+    for path in sorted(paths):
+        if path not in plan.files and not path.exists():
+            errors.append("缺少页面：%s" % path.relative_to(ROOT).as_posix())
+            continue
+        page = _PageReferences(plan.read(path))
+        pages[path] = page
+        for name, count in Counter(page.ids).items():
+            if count > 1:
+                errors.append("%s：重复的段落编号 id=%r" % (path.relative_to(ROOT).as_posix(), name))
+    site = urlsplit(SITE["url"])
+    site_path = unquote(site.path).rstrip("/")
+    planned_names = {p.relative_to(ROOT).as_posix() for p in plan.files}
+
+    def resolve_ref(source: Path, ref: str):
+        url = urlsplit(ref)
+        if url.scheme and url.scheme not in ("http", "https"):
+            return None
+        if url.netloc and url.netloc.casefold() != site.netloc.casefold():
+            return None
+        raw = unquote(url.path)
+        if raw.startswith("/") and site_path and (raw == site_path or raw.startswith(site_path + "/")):
+            raw = raw[len(site_path):] or "/"
+        if not raw:
+            target = source
+        else:
+            target = ROOT / raw.lstrip("/") if raw.startswith("/") else source.parent / raw
+        target = Path(os.path.abspath(target))
+        if raw.endswith("/") or target.is_dir():
+            target /= "index.html"
+        return target, unquote(url.fragment)
+
+    def exists_exact(path: Path) -> bool:
+        if not path.resolve().is_relative_to(ROOT.resolve()) or path in plan.deletes:
+            return False
+        rel = path.relative_to(ROOT)
+        if path in plan.files:
+            return rel.as_posix() in planned_names
+        current = ROOT
+        for part in rel.parts:
+            if not current.is_dir() or part not in {p.name for p in current.iterdir()}:
+                return False
+            current /= part
+        return current.is_file()
+
+    references = [(p, ref) for p, page in pages.items() for ref in page.refs]
+    for path in (ROOT / "css").rglob("*.css"):
+        for ref in re.findall(r"url\(\s*['\"]?([^)'\"]+)['\"]?\s*\)", path.read_text(encoding="utf-8")):
+            references.append((path, ref.strip()))
+    for source, ref in references:
+        try:
+            resolved = resolve_ref(source, ref)
+        except ValueError:
+            errors.append("%s：链接格式不正确 %r" % (source.relative_to(ROOT).as_posix(), ref))
+            continue
+        if resolved is None:
+            continue
+        target, fragment = resolved
+        if not exists_exact(target):
+            errors.append("%s：找不到本地文件或大小写不一致 %r" % (source.relative_to(ROOT).as_posix(), ref))
+        elif fragment and not fragment.startswith(":~:text=") and target in pages and fragment not in pages[target].ids:
+            errors.append("%s：链接 %r 指向不存在的段落" % (source.relative_to(ROOT).as_posix(), ref))
+    return list(dict.fromkeys(errors))
+
+
+def cmd_check() -> int:
+    plan, posts = make_build_plan()
+    errors = check_site(plan)
+    if errors:
+        print("检查发现 %d 项问题：" % len(errors))
+        for error in errors:
+            print("  ! " + error)
+        return 1
+    print("检查通过：%d 篇文章，页面、段落链接、图片、脚本等本地引用有效，生成结果已同步。" % len(posts))
+    return 0
+
+
+def _preview_snapshot() -> dict[Path, tuple[int, int]]:
+    paths = {ROOT / name for name in ("index.html", "archive.html", "about.html", "tools.html", "404.html")}
+    for name in ("posts", "css", "js", "tools", "video", "PostPic"):
+        for path in (ROOT / name).rglob("*"):
+            if path.is_file() and not (name == "posts" and path.suffix == ".html"):
+                if path.name != "search-index.js":
+                    paths.add(path)
+    return {p: (p.stat().st_mtime_ns, p.stat().st_size) for p in paths if p.exists()}
+
+
+def cmd_preview(args: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="python build.py preview", description="在内存中构建并预览，修改后自动刷新")
+    parser.add_argument("--port", type=int, default=8080, help="本地端口，默认 8080")
+    parser.add_argument("--no-browser", action="store_true", help="只启动服务，不自动打开浏览器")
+    options = parser.parse_args(args)
+    if not 0 <= options.port <= 65535:
+        raise BuildError("端口应在 0 到 65535 之间")
+    plan, _ = make_build_plan()
+    state = {"plan": plan, "version": 1}
+    stop = threading.Event()
+
+    class PreviewHandler(SimpleHTTPRequestHandler):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, directory=str(ROOT), **kw)
+
+        def end_headers(self):
+            self.send_header("Cache-Control", "no-store")
+            super().end_headers()
+
+        def virtual(self, head_only=False):
+            route = urlsplit(self.path).path
+            if route == "/__muroj_preview_version":
+                data = str(state["version"]).encode("ascii")
+                mime, status = "application/json", 200
+            else:
+                target = Path(self.translate_path(self.path))
+                if target.is_dir() or route.endswith("/"):
+                    target /= "index.html"
+                current = state["plan"]
+                if target in current.deletes or (target not in current.files and not target.is_file()):
+                    target, status = ROOT / "404.html", 404
+                else:
+                    status = 200
+                if target not in current.files and target.suffix != ".html":
+                    return False
+                text = current.read(target)
+                if target.suffix == ".html":
+                    script = ('<script data-muroj-preview>(function(){var v=%d;setInterval(function(){'
+                              'fetch("/__muroj_preview_version",{cache:"no-store"}).then(function(r){return r.json();})'
+                              '.then(function(n){if(n!==v)location.reload();}).catch(function(){});},900);})();</script>'
+                              % state["version"])
+                    text = text.replace("</body>", script + "\n</body>", 1)
+                data = text.encode("utf-8")
+                mime = self.guess_type(str(target)) + "; charset=utf-8"
+            self.send_response(status)
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            if not head_only:
+                self.wfile.write(data)
+            return True
+
+        def do_GET(self):
+            if not self.virtual():
+                super().do_GET()
+
+        def do_HEAD(self):
+            if not self.virtual(True):
+                super().do_HEAD()
+
+        def log_message(self, fmt, *args):
+            if urlsplit(self.path).path != "/__muroj_preview_version":
+                super().log_message(fmt, *args)
+
+    def watch():
+        previous = _preview_snapshot()
+        while not stop.wait(0.5):
+            try:
+                current = _preview_snapshot()
+                if current == previous:
+                    continue
+                previous = current
+                new_plan, _ = make_build_plan()
+                state["plan"] = new_plan
+                state["version"] += 1
+                print("预览已更新。", flush=True)
+            except (OSError, ValueError) as exc:
+                print("预览更新失败，暂时保留上次成功的页面：%s" % exc, flush=True)
+
+    with ThreadingHTTPServer(("127.0.0.1", options.port), PreviewHandler) as server:
+        address = "http://127.0.0.1:%d/" % server.server_port
+        print("预览地址：%s\n修改 Markdown、页面或样式后会自动刷新；Ctrl+C 结束。" % address, flush=True)
+        print("预览不会改写生成文件；发布前仍需运行 python build.py。", flush=True)
+        for error in check_site(plan, include_stale=False):
+            print("  ! " + error, flush=True)
+        watcher = threading.Thread(target=watch, daemon=True)
+        watcher.start()
+        if not options.no_browser:
+            webbrowser.open(address)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\n预览已停止。")
+        finally:
+            stop.set()
+            watcher.join(timeout=2)
     return 0
 
 
 def cmd_new(title: str, slug_arg: str | None = None) -> int:
     today = dt.date.today().isoformat()
     slug = slugify(slug_arg or title)[:60]
+    validate_slug(slug)
+    if "\n" in title or "\r" in title:
+        raise BuildError("文章标题应写在一行内")
     path = POSTS_DIR / ("%s.md" % slug)
     if path.exists():
         print("已存在：%s" % path)
@@ -1204,29 +1692,29 @@ def cmd_list() -> int:
 def cmd_url(new_url: str) -> int:
     """一条命令改好全站网址：改 build.py 自己的配置 + 替换静态页里写死的地址。"""
     new_url = new_url.strip().rstrip("/")
-    if not re.match(r"^https?://", new_url):
+    parsed = urlsplit(new_url)
+    if (parsed.scheme not in ("http", "https") or not parsed.netloc or parsed.query or parsed.fragment
+            or re.search(r'[\s<>"\\]', new_url)):
         print("地址要以 http:// 或 https:// 开头，例如：")
         print("  python build.py url https://yourname.github.io")
         print("  python build.py url https://yourname.github.io/my-blog")
         return 1
 
     old_url = SITE["url"].rstrip("/")
+    plan = BuildPlan()
 
     # 1) 改 build.py 自己的 SITE["url"]
     me = Path(__file__).resolve()
     src = me.read_text(encoding="utf-8")
     new_src, n_cfg = re.subn(
         r'("url"\s*:\s*)"[^"]*"',
-        lambda m: m.group(1) + '"%s"' % new_url,
+        lambda m: m.group(1) + json.dumps(new_url, ensure_ascii=False),
         src, count=1,
     )
     if n_cfg:
-        me.write_text(new_src, encoding="utf-8", newline="\n")
-        SITE["url"] = new_url          # 同步内存里的配置，否则下面的构建还用旧地址
-        print("已更新 build.py 的 SITE[\"url\"] -> %s" % new_url)
+        plan.write(me, new_src)
     else:
-        print("! 没能在 build.py 里找到 SITE[\"url\"]，请手动修改")
-        SITE["url"] = new_url
+        raise BuildError("没能在 build.py 里找到 SITE[\"url\"]，未修改任何文件")
 
     # 2) 替换静态页面里写死的 canonical / og:url / og:image / feed.xml 地址
     targets = ["index.html", "archive.html", "about.html", "tools.html", "404.html", "README.md", "README2.md"]
@@ -1237,40 +1725,45 @@ def cmd_url(new_url: str) -> int:
             continue
         text = f.read_text(encoding="utf-8")
         if old_url and old_url in text:
-            f.write_text(text.replace(old_url, new_url), encoding="utf-8", newline="\n")
-            print("  已替换 %s" % name)
+            plan.write(f, text.replace(old_url, new_url))
             changed += 1
-    if not changed:
-        print("  静态页面里没有找到旧地址 %s，无需替换" % old_url)
-
-    # 3) 重新构建，让 sitemap.xml / feed.xml / 文章页一起更新
-    print()
-    return cmd_build()
+    # 配置、静态页与生成页一起提交；转换失败时旧网址仍然有效。
+    SITE["url"] = new_url
+    try:
+        plan, _ = make_build_plan(plan)
+        plan.commit()
+    except BaseException:
+        SITE["url"] = old_url
+        raise
+    print("已将全站网址更新为 %s（同步 %d 个静态文件）。" % (new_url, changed))
+    return 0
 
 
 def main() -> int:
     args = sys.argv[1:]
-    if not args:
-        return cmd_build()
-    cmd = args[0].lower()
-    if cmd == "new":
-        if len(args) < 2:
-            print('用法：python build.py new "文章标题" [英文文件名]')
-            return 1
-        return cmd_new(args[1], args[2] if len(args) > 2 else None)
-    if cmd == "list":
-        return cmd_list()
-    if cmd == "url":
-        if len(args) < 2:
-            print("用法：python build.py url https://你的用户名.github.io")
-            return 1
-        return cmd_url(args[1])
-    if cmd in ("build", "-h", "--help", "help"):
+    try:
+        if not args or (args[0].lower() == "build" and len(args) == 1):
+            return cmd_build()
+        cmd = args[0].lower()
+        if cmd == "preview":
+            return cmd_preview(args[1:])
+        if cmd == "check" and len(args) == 1:
+            return cmd_check()
+        if cmd == "new" and 2 <= len(args) <= 3:
+            return cmd_new(args[1], args[2] if len(args) == 3 else None)
+        if cmd == "list" and len(args) == 1:
+            return cmd_list()
+        if cmd == "url" and len(args) == 2:
+            return cmd_url(args[1])
+        if cmd in ("-h", "--help", "help"):
+            print(__doc__)
+            return 0
+        print("未知命令或参数不正确：%s\n" % " ".join(args))
         print(__doc__)
-        return 0
-    print("未知命令：%s\n" % cmd)
-    print(__doc__)
-    return 1
+        return 1
+    except (OSError, ValueError) as exc:
+        print("失败：%s" % exc, file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

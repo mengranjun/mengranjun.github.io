@@ -159,7 +159,7 @@ git push -u origin main
 
 > **部署前记得改两处地址**：
 > 1. `build.py` 里的 `SITE["url"]` —— 改成你的真实地址，否则 `sitemap.xml`、`feed.xml` 和分享卡片的链接会是占位值；
-> 2. 各 HTML 里的 `og:url` / `canonical` —— 它们是静态写死的，`index.html`、`archive.html`、`about.html`、`404.html` 各一处。
+> 2. 各 HTML 里的 `og:url` / `canonical` —— 它们是静态写死的，`index.html`、`archive.html`、`about-Fw'Qi.html`、`404.html` 各一处。
 > 改完重新运行 `python build.py`。
 
 ## 本地预览

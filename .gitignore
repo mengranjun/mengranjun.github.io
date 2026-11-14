@@ -4,6 +4,7 @@
 .workbuddy/
 __pycache__/
 *.pyc
+.muroj-build-*/
 
 # 待评估的预览页（满意后合并进正式文件再删掉）
 preview-*.html
