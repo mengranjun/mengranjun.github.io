@@ -16,13 +16,19 @@
   <meta property="og:url" content="https://mengranjun.github.io/about.html">
   <meta property="og:image" content="https://mengranjun.github.io/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=7ad5bb21fc81">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="alternate" type="application/rss+xml" title="MurojBlog" href="https://mengranjun.github.io/feed.xml">
   <script>document.documentElement.className+=" js";try{var t=localStorage.getItem("blog-theme");if(!t){var h=new Date().getHours();t=(h>=7&&h<19)?"light":"dark";}document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
-
+  <!-- 基础兜底：即使外部样式未加载或仍是旧版，也不能让多段介绍叠在一起。 -->
+  <style>
+    .about-swap-multi > p[hidden],
+    .about-swap-multi > p:not(.is-on),
+    .alias-hint[hidden],
+    .alias-count[hidden] { display: none !important; }
+  </style>
 </head>
 <body>
 <!-- BUILD:HEADER:START -->
@@ -65,7 +71,7 @@
                  菜单、名字舞台、序号、往返端点均由 JS 自动生成。
                  下面菜单 / 舞台中的第一行是禁用 JS 时的兜底，无需扩充。
                ══════════════════════════════════════════════════════════════ -->
-          <h2 class="hello-line">你好，我是 “
+          <h2 class="hello-line"><span class="hello-name">你好，我是 “
             <span class="alias" role="button" tabindex="0" aria-label="孟然君，点击切换名字" aria-expanded="false">
               <!-- 展开时弹出的菜单：一列名字 + 一个会滑动的复选框 -->
               <span class="alias-menu" aria-hidden="true">
@@ -84,9 +90,11 @@
               <span class="alias-stage" aria-hidden="true">
                 <span class="alias-name">孟然君</span>
               </span>
-            </span>”
-            <!-- 名字旁边的操作提示：菜单展开时淡入 -->
-            <span class="alias-hint" aria-hidden="true">点击往返切换名字，也可使用滚轮或方向键。</span>
+              <!-- 当前序号 / 总数由 JS 自动更新；只有一个名字时不显示。 -->
+              <span class="alias-count" aria-hidden="true" hidden></span>
+            </span>”</span>
+            <!-- 初始不占位：电脑放在名字右侧，手机在下方展开并推开介绍。 -->
+            <span class="alias-hint" aria-hidden="true" hidden><span class="alias-hint-bubble">点击往返切换名字，也可使用滚轮或方向键。</span></span>
           </h2>
 
           <!-- ══════════════════════════════════════════════════════════════
@@ -100,8 +108,8 @@
                ══════════════════════════════════════════════════════════════ -->
           <div class="about-swap about-swap-multi" aria-live="polite" aria-atomic="true">
             <p data-name="孟然君" class="is-on">「孟然君」是我“绞尽脑汁”想出来的网名。最开始叫“孟然”，后面才在末尾加上了“君”。没有什么特别含义，只是觉得它很适合我罢了。</p>
-            <p data-name="Muroj" aria-hidden="true">「Muroj」是我根据「孟然君」的读音来给自己取的英文名。比原来的 “mengranjun” 短，看着更舒服些。两个名字，指的是同一具灵魂。</p>
-            <p data-name="Mengranjun" aria-hidden="true">「Mengranjun」是我最早用的英文名——直接把中文名拼出来的名字。不过由于名字太长和“不够创新”的缘故，所以后来换成了 Muroj，目前仅部分平台仍在保留。</p>
+            <p data-name="Muroj" aria-hidden="true" hidden>「Muroj」是我根据「孟然君」的读音来给自己取的英文名。比原来的 “mengranjun” 短，看着更舒服些。两个名字，指的是同一具灵魂。</p>
+            <p data-name="Mengranjun" aria-hidden="true" hidden>「Mengranjun」是我最早用的英文名——直接把中文名拼出来的名字。不过由于名字太长和“不够创新”的缘故，所以后来换成了 Muroj，目前仅部分平台仍在保留。</p>
             <!-- <p data-name="Mourj" aria-hidden="true">「Mourj」</p> -->
           </div>
 
@@ -144,8 +152,8 @@
   </footer>
 <!-- BUILD:FOOTER:END -->
 
-  <script src="js/main.js"></script>
-  <script src="js/enhance.js"></script>
+  <script src="js/main.js?v=86f018695b6d"></script>
+  <script src="js/enhance.js?v=e18269e25115"></script>
 
 </body>
 </html>

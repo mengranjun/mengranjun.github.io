@@ -38,7 +38,7 @@ from collections import Counter
 from html.parser import HTMLParser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 ROOT = Path(__file__).resolve().parent
 POSTS_DIR = ROOT / "posts"
@@ -1036,6 +1036,35 @@ class BuildPlan:
         return len(changed), len(deleted)
 
 
+def version_local_assets(page: Path, text: str, plan: BuildPlan | None = None) -> str:
+    """内容变化时更新 CSS / JS 的版本，避免手机拿新 HTML 配旧缓存资源。"""
+    def replace(match):
+        raw = html.unescape(match["url"])
+        try:
+            url = urlsplit(raw)
+        except ValueError:
+            return match[0]
+        if url.scheme or url.netloc or Path(url.path).suffix.lower() not in (".css", ".js"):
+            return match[0]
+        path = ((ROOT / unquote(url.path).lstrip("/")) if url.path.startswith("/")
+                else page.parent / unquote(url.path)).resolve()
+        if not path.is_relative_to(ROOT.resolve()):
+            return match[0]
+        if plan is not None and path in plan.files:
+            content = plan.files[path].encode("utf-8")
+        elif path.is_file():
+            content = path.read_bytes()
+        else:
+            return match[0]
+        version = hashlib.sha256(content).hexdigest()[:12]
+        query = [(k, v) for k, v in parse_qsl(url.query, keep_blank_values=True) if k != "v"]
+        query.append(("v", version))
+        value = urlunsplit(("", "", url.path, urlencode(query), url.fragment))
+        return match["prefix"] + match["quote"] + html.escape(value, quote=True) + match["quote"]
+
+    return re.sub(r'''(?P<prefix>\b(?:src|href)\s*=\s*)(?P<quote>["'])(?P<url>[^"']+)(?P=quote)''', replace, text)
+
+
 def inject(path: Path, name: str, content: str, indent: str = "          ",
            plan: BuildPlan | None = None) -> bool:
     text = plan.read(path) if plan else path.read_text(encoding="utf-8")
@@ -1401,6 +1430,9 @@ def make_build_plan(plan: BuildPlan | None = None) -> tuple[BuildPlan, list[dict
     build_sitemap(posts, plan)
     build_feed(posts, plan)
     build_search_index(posts, plan)
+    for path, text in list(plan.files.items()):
+        if path.suffix == ".html":
+            plan.write(path, version_local_assets(path, text, plan))
     return plan, posts
 
 

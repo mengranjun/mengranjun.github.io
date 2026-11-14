@@ -639,14 +639,20 @@ main { flex: 1; }
    桌面端：
      ① 鼠标移到「孟然君」上 → 菜单展开、复选框亮起并画出对勾
      ② 滚轮上/下 → 复选框在名字列表里上下滑动，显示的名字跟着切换
-     ③ 鼠标移开后菜单「保持展开」（按 Esc 或点别处才收起）
+     ③ 鼠标离开名字和菜单后，短暂缓冲再平滑收起（也可按 Esc 或点别处）
    鼠标点击 / 手指轻点：1→2→…→末尾→…→2→1，重复往返。
    状态由 js/enhance.js 给 .alias 加 .is-open 来驱动；
    没有 JS 时下面的 :hover / :focus 规则仍然能让菜单弹出来。
    外面那圈「小黑/白框 + 四角括号 + 呼吸点」是给读者的提示。
    ============================================================ */
 
-.hello-line { position: relative; }
+.hello-line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  column-gap: 14px;
+}
+.hello-name { display: block; flex: 0 1 auto; }
 
 .alias {
   display: inline-grid;      /* grid 容器会忽略空白文本节点，排版更稳 */
@@ -660,6 +666,26 @@ main { flex: 1; }
   border-radius: 10px;
   transition: border-color 0.25s ease, background-color 0.25s ease;
 }
+
+.alias.has-count {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+}
+
+/* 常显的小序号，让人一眼知道名字还可以切换；数字等宽，避免更新时抖动。 */
+.alias-count {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--text-muted);
+}
+.alias-count[hidden] { display: none; }
 
 .alias:hover,
 .alias:focus,
@@ -776,31 +802,36 @@ main { flex: 1; }
   box-shadow: var(--shadow);
   white-space: nowrap;
   opacity: 0;
-  transform: translate(-50%, 8px) scale(0.92);
+  visibility: hidden;
+  transform: translate(-50%, 8px) scale(0.96);
   transform-origin: 50% 130%;
   pointer-events: none;
   z-index: 300;              /* 必须高于 .site-header 的 100，否则会被置顶导航挡住 */
-  transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.22s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+              visibility 0s linear 0.3s;
 }
 
-.alias:hover .alias-menu,
-.alias:focus .alias-menu,
+/* 有 JS 时只由 is-open 控制，避免点击后 :focus 让菜单关不掉。 */
+html:not(.js) .alias:hover .alias-menu,
+html:not(.js) .alias:focus .alias-menu,
 .alias.is-open .alias-menu {
   opacity: 1;
+  visibility: visible;
   transform: translate(-50%, 0) scale(1);
   pointer-events: auto;
+  transition-delay: 0s;
 }
 
 /* ---- 上方放不下时（名字贴着置顶导航），菜单翻到名字下面 ---- */
 .alias.is-flip .alias-menu {
   top: calc(100% + 14px);
   bottom: auto;
-  transform: translate(-50%, -8px) scale(0.92);
+  transform: translate(-50%, -8px) scale(0.96);
   transform-origin: 50% -30%;
 }
 
-.alias.is-flip:hover .alias-menu,
-.alias.is-flip:focus .alias-menu,
+html:not(.js) .alias.is-flip:hover .alias-menu,
+html:not(.js) .alias.is-flip:focus .alias-menu,
 .alias.is-flip.is-open .alias-menu { transform: translate(-50%, 0) scale(1); }
 
 .alias.is-flip .alias-menu-arrow {
@@ -829,10 +860,28 @@ main { flex: 1; }
 
 .alias-list { display: flex; flex-direction: column; }
 
-/* ---- 名字旁边的操作提示：菜单展开时淡入 ---- */
+/* ---- 操作提示：桌面与名字并排，手机另起一行；未操作时不占位 ---- */
 .alias-hint {
-  display: inline-block;
-  margin-left: 0.7em;
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 22rem;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: height 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+}
+.alias-hint[hidden] { display: none !important; }
+.alias-hint-bubble {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-top: 0;
   font-family: var(--font-sans);
   font-size: 0.76rem;
   font-weight: 500;
@@ -843,30 +892,22 @@ main { flex: 1; }
   border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 999px;
   padding: 3px 12px;
-  white-space: nowrap;
-  vertical-align: middle;
-  opacity: 0;
-  transform: translateX(-6px);
-  transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-  pointer-events: none;
+  white-space: normal;
+  transform: translateY(-4px);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-.alias:hover ~ .alias-hint,
-.alias:focus ~ .alias-hint,
-.alias.is-open ~ .alias-hint {
+.alias-hint.is-visible {
   opacity: 1;
-  transform: translateX(0);
-  transition-delay: 0.45s;
 }
+.alias-hint.is-visible .alias-hint-bubble { transform: translateY(0); }
 
 @media (max-width: 720px) {
-  .alias-hint {
-    display: block;
-    margin: 10px 0 0;
-    white-space: normal;
-    width: fit-content;
-  }
+  .hello-line { display: block; }
+  .hello-name { display: inline; }
+  .alias-hint { width: 100%; max-width: none; }
+  .alias-hint-bubble { margin-top: 10px; }
 }
+
 .alias-opt {
   display: flex;
   align-items: center;
@@ -946,15 +987,12 @@ main { flex: 1; }
 }
 
 .about-swap-multi > p {
-  opacity: 0;
-  filter: blur(3px);
-  pointer-events: none;
-}
-.about-swap-multi > p.is-on {
+  grid-area: auto;
   opacity: 1;
-  filter: blur(0);
-  pointer-events: auto;
+  filter: none;
 }
+.about-swap-multi { display: block; }
+.about-swap-multi > p[hidden] { display: none !important; }
 
 .about-swap-alt { opacity: 0; filter: blur(3px); pointer-events: none; }
 
@@ -1081,8 +1119,26 @@ main { flex: 1; }
   .theme-toggle { margin-left: 0; }
 
   .post-list li { grid-template-columns: 1fr; gap: 6px; }
-  .about-grid { grid-template-columns: 1fr; gap: 30px; }
-  .about-side { position: static; }
+  .about-grid { grid-template-columns: 1fr; gap: 28px; padding-top: 36px; }
+  /* 手机把头像和昵称简介并排，给名字介绍留出更多首屏空间。 */
+  .about-side {
+    position: static;
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    column-gap: 20px;
+    row-gap: 4px;
+    align-items: center;
+  }
+  .about-side .avatar {
+    grid-row: 1 / 3;
+    width: 112px;
+    height: 112px;
+    border-radius: 20px;
+  }
+  .about-side .avatar svg { width: 60px; height: 60px; }
+  .about-side .avatar::after { font-size: 1.45rem; }
+  .about-side .name { margin-top: 0; font-size: 1.25rem; align-self: end; }
+  .about-side .bio-short { margin-top: 0; align-self: start; }
   .hero { padding: 56px 0 44px; }
 }
 
@@ -1444,6 +1500,7 @@ main { flex: 1; }
   .about-swap-alt { filter: none; }
   .about-content:has(.alias.is-alt) .about-swap-default { filter: none; }
   .alias-hint { transition: none; }
+  .alias-hint-bubble { transition: none; transform: none; }
 }
 
 /* ==========================================================================

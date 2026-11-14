@@ -12,9 +12,13 @@ import tempfile
 import threading
 import time
 import unittest
+import hashlib
 from pathlib import Path
 from unittest.mock import patch
 from urllib.request import urlopen
+from urllib.parse import parse_qs, urlsplit
+from html import unescape
+from html.parser import HTMLParser
 
 import build
 
@@ -242,6 +246,41 @@ class SiteTests(unittest.TestCase):
 
     def test_check_reports_stale_outputs(self):
         self.assertTrue(any('尚未同步' in e for e in build.check_site(self.render())))
+
+    def test_asset_version_changes_with_file_contents(self):
+        first = self.render().files[self.root / 'about.html']
+        stylesheet = self.root / 'css/style.css'
+        stylesheet.write_text(stylesheet.read_text(encoding='utf-8') + '\n/* 更新 */\n', encoding='utf-8')
+        second = self.render().files[self.root / 'about.html']
+        pattern = r'href="(css/style\.css\?[^\"]+)"'
+        self.assertNotEqual(re.search(pattern, first)[1], re.search(pattern, second)[1])
+
+    def test_asset_version_uses_newly_generated_script(self):
+        plan = build.BuildPlan()
+        script = 'window.__SEARCH_INDEX__ = [];\n'
+        plan.write(self.root / 'js/search-index.js', script)
+        text = '<script src="js/search-index.js?mode=full&amp;v=old"></script>'
+        result = build.version_local_assets(self.root / 'about.html', text, plan)
+        url = unescape(re.search(r'src="([^\"]+)"', result)[1])
+        query = parse_qs(urlsplit(url).query)
+        self.assertEqual(query['mode'], ['full'])
+        self.assertEqual(query['v'], [hashlib.sha256(script.encode('utf-8')).hexdigest()[:12]])
+
+    def test_about_has_safe_html_fallback(self):
+        names, hints = [], []
+
+        class FallbackParser(HTMLParser):
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == 'p' and 'data-name' in attrs:
+                    names.append(attrs)
+                if 'alias-hint' in attrs.get('class', '').split():
+                    hints.append(attrs)
+
+        FallbackParser().feed((self.root / 'about.html').read_text(encoding='utf-8'))
+        self.assertTrue(names)
+        self.assertEqual(sum('hidden' not in attrs for attrs in names), 1)
+        self.assertTrue(hints and all('hidden' in attrs for attrs in hints))
 
     def test_cli_build_alias_and_check(self):
         env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1', PYTHONIOENCODING='utf-8')

@@ -373,6 +373,7 @@
 
     var menu = $(".alias-menu", alias);
     var stage = $(".alias-stage", alias);
+    var counter = $(".alias-count", alias);
     var grid = $(".about-grid");
     var swap = $(".about-swap", grid || doc);
     var multi = !!(swap && swap.classList.contains("about-swap-multi"));
@@ -392,6 +393,7 @@
         if (namedDescriptions.indexOf(el) >= 0) return;
         // 漏写 data-name 的段落不应让已有名字全部失效。
         el.classList.remove("is-on");
+        el.hidden = true;
         el.setAttribute("aria-hidden", "true");
         if (window.console) console.warn("名字介绍缺少 data-name，已跳过该段落。", el);
       });
@@ -421,6 +423,22 @@
     var clickDirection = 1;  // 在两端自动折返；名字数量从上方 HTML 自动读取。
     var open = false;
     var timer = null;
+    var leaveTimer = null;
+    var hello = alias.closest(".hello-line") || alias.parentNode;
+    var hint = $(".alias-hint", hello);
+    var hintBubble = hint && $(".alias-hint-bubble", hint);
+    var hintActivated = false, hintShowing = false, hintTimer = null;
+    if (hint) {
+      // 旧备份页也兼容新的零占位提示，不依赖额外的页面脚本。
+      if (!hintBubble) {
+        hintBubble = doc.createElement("span");
+        hintBubble.className = "alias-hint-bubble";
+        while (hint.firstChild) hintBubble.appendChild(hint.firstChild);
+        hint.appendChild(hintBubble);
+      }
+      hint.hidden = true;
+      hint.style.height = "0px";
+    }
     var CHOSEN = "muroj-alias-chosen";
     var header = $(".site-header");
 
@@ -482,6 +500,32 @@
       alias.classList.toggle("is-flip", room < menu.offsetHeight + 26);
     }
 
+    function fitHint() {
+      if (!hint || !hintBubble) return;
+      hintShowing = hintActivated && open && n > 1;
+      window.clearTimeout(hintTimer);
+      if (hintShowing) {
+        if (hint.hidden) {
+          hint.style.height = "0px";
+          hint.hidden = false;
+          void hint.offsetHeight; // 先提交零高度，再过渡到内容高度。
+        }
+        var cs = window.getComputedStyle(hintBubble);
+        var height = hintBubble.getBoundingClientRect().height +
+          (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+        hint.classList.add("is-visible");
+        hint.style.height = Math.ceil(height) + "px";
+      } else {
+        hint.classList.remove("is-visible");
+        hint.style.height = "0px";
+        if (!hint.hidden) {
+          hintTimer = window.setTimeout(function () {
+            if (!hintShowing) hint.hidden = true;
+          }, reduced ? 0 : 340);
+        }
+      }
+    }
+
     function render() {
       menu.style.setProperty("--sel", cur);
       opts.forEach(function (o, i) { o.classList.toggle("is-on", i === cur); });
@@ -492,27 +536,38 @@
       });
       // 描述跟着「当前选中的名字」走，而不是跟着「菜单开着」走
       alias.classList.toggle("is-alt", cur > 0);
-      alias.setAttribute("aria-label", names[cur].textContent.trim() + "，点击切换名字，也可使用方向键");
+      alias.setAttribute("aria-label", names[cur].textContent.trim() + "，第 " + (cur + 1) + " 个名字，共 " + n + " 个，点击切换名字，也可使用方向键");
+      if (counter) {
+        counter.textContent = (cur + 1) + "/" + n;
+        counter.style.minWidth = (String(n).length * 2 + 1) + "ch";
+        counter.hidden = n < 2;
+        alias.classList.toggle("has-count", n > 1);
+      }
       if (multi) {
         var selectedDescription = Math.min(cur, descriptions.length - 1);
         descriptions.forEach(function (el, i) {
           el.classList.toggle("is-on", i === selectedDescription);
+          el.hidden = i !== selectedDescription;
           el.setAttribute("aria-hidden", i === selectedDescription ? "false" : "true");
         });
       }
       fitName();   // 外框宽度跟着当前名字走
       if (fitSwap) fitSwap();  // 每次选择都直接同步，不能依赖 is-alt 是否改变。
+      fitHint();
     }
 
     function setOpen(v) {
+      window.clearTimeout(leaveTimer);
       open = v;
       if (v) placeMenu();
       alias.classList.toggle("is-open", v);
       alias.setAttribute("aria-expanded", v ? "true" : "false");
+      fitHint();
     }
 
     function select(i) {
       if (i < 0 || i >= n || i === cur) return false;
+      hintActivated = true;
       // 滚轮或键盘操作后，下一次点击沿着刚才的方向继续；在两端折返。
       clickDirection = i > cur ? 1 : -1;
       cur = i;
@@ -566,10 +621,20 @@
     setOpen(false);
 
     /* 字体加载完成 / 窗口尺寸变化后，名字宽度可能变，重新量一遍 */
-    window.addEventListener("resize", function () { measureNames(); fitName(); });
+    window.addEventListener("resize", function () { measureNames(); fitName(); fitHint(); });
     if (doc.fonts && doc.fonts.ready && doc.fonts.ready.then) {
-      doc.fonts.ready.then(function () { measureNames(); fitName(); }).catch(function () {});
+      doc.fonts.ready.then(function () { measureNames(); fitName(); fitHint(); }).catch(function () {});
     }
+    // 桌面端提示位于名字右侧；名字变宽时，提示可能换行，需要同步高度。
+    if (window.ResizeObserver && hintBubble) {
+      var hintObserver = new window.ResizeObserver(function () {
+        if (hintShowing) fitHint();
+      });
+      hintObserver.observe(hintBubble);
+    }
+    if (stage) stage.addEventListener("transitionend", function (e) {
+      if (e.target === stage && e.propertyName === "width") fitHint();
+    });
 
     /* ---- 滚动 / 改窗口大小时重新判断菜单该往上还是往下弹 ---- */
     var placeQueued = false;
@@ -582,13 +647,25 @@
     window.addEventListener("resize", placeMenu);
     placeMenu();
 
-    /* ---- 桌面：悬浮展开，且不因鼠标移开而收起 ---- */
+    /* ---- 桌面：悬浮展开，离开名字和菜单后平滑收起 ---- */
     if (!coarse) {
-      alias.addEventListener("pointerenter", function () {
+      alias.addEventListener("pointerenter", function (e) {
+        if (e.pointerType === "touch") return;
         setOpen(true);
         markChosen();
       });
+      alias.addEventListener("pointerleave", function (e) {
+        if (e.pointerType === "touch") return;
+        window.clearTimeout(leaveTimer);
+        // 名字和弹出菜单之间有 14px 空隙，给鼠标一点穿过空隙的时间。
+        // 重新进入任一区域、点击或使用键盘时，setOpen 会取消这次收起。
+        leaveTimer = window.setTimeout(function () { setOpen(false); }, 180);
+      });
     }
+
+    // 键盘聚焦仍能展开；点击留下的焦点不会强制菜单一直显示。
+    alias.addEventListener("focus", function () { setOpen(true); });
+    alias.addEventListener("blur", function () { setOpen(false); });
 
     /* ---- 滚轮切换名字 ---- */
     alias.addEventListener("wheel", function (e) {
@@ -603,6 +680,7 @@
     /* ---- 鼠标单击 / 手指轻点：向前到末尾，再向后回到开头，重复往返 ---- */
     alias.addEventListener("click", function (e) {
       e.preventDefault();
+      hintActivated = true;
       advanceName();
       setOpen(true);
       markChosen();
@@ -615,6 +693,7 @@
       var k = e.key;
       if (k === "Enter" || k === " ") {
         e.preventDefault();
+        hintActivated = true;
         setOpen(true);
         markChosen();
         advanceName();
